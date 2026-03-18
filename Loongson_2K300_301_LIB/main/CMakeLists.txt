@@ -21,6 +21,7 @@ aux_source_directory(${PROJECT_SOURCE_DIR}/../libraries/app/display SRC)
 aux_source_directory(${PROJECT_SOURCE_DIR}/../libraries/common/src SRC)
 aux_source_directory(${PROJECT_SOURCE_DIR}/../libraries/drv/src SRC)
 aux_source_directory(${PROJECT_SOURCE_DIR}/../example/src SRC)
+aux_source_directory(${PROJECT_SOURCE_DIR}/../user_app SRC)
 
 # 指定所用的头文件路径
 include_directories(
@@ -31,6 +32,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/../libraries/common/inc
     ${PROJECT_SOURCE_DIR}/../libraries/drv/inc
     ${PROJECT_SOURCE_DIR}/../example/inc
+    ${PROJECT_SOURCE_DIR}/../user_app
 )
 
 # 查找 pkgconfig 工具（必须，用于解析 .pc 文件）
