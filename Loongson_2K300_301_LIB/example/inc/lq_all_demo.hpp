@@ -21,5 +21,9 @@ void lq_vl53l0x_demo(void);         // VL53L0X 测试
 void lq_udp_img_trans_demo(void);   // UDP 图像传输测试
 void lq_udp_wavefrom_demo(void);    // UDP 波形传输测试
 void lq_icm42688_demo(void);        // ICM42688 测试
+void lq_ntp_demo(void);             // NTP 获取网络时间并更新到系统中测试
+void lq_timer_demo(void);           // 定时器回调测试
+void lq_module_load_demo(void);     // 模块加载函数测试
+void lq_ips20_show_img_demo(void);  // IPS20 显示图像测试
 
 #endif

@@ -2,18 +2,18 @@
 #include <opencv2/opencv.hpp>
 #include <ncnn/net.h>
 
-// 获取当前时间戳字符串
-static std::string GetTimestamp()
-{
-    auto now = std::chrono::system_clock::now();
-    auto ms  = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-    time_t t = std::chrono::system_clock::to_time_t(now);
-    tm* tm = localtime(&t);
+/********************************************************************************
+ * @file    lq_ncnn_demo.cpp
+ * @brief   NCNN 测试.
+ * @author  龙邱科技-006
+ * @date    2026-01-10
+ * @version V2.1.0
+ * @note    适用与龙芯 2K0300/0301 平台.
+ *          本 demo 实现 NCNN 功能，用于测试 NCNN 模型的基本功能.
+ ********************************************************************************/
 
-    std::stringstream ss;
-    ss << std::put_time(tm, "%Y-%m-%d %H:%M:%S") << "." << std::setfill('0') << std::setw(3) << ms.count();
-    return ss.str();
-}
+// 时间获取对象
+static lq_ntp g_ntp;
 
 void lq_ncnn_demo(void)
 {
@@ -102,15 +102,15 @@ void lq_ncnn_photo_demo(void)
     ncnn.SetNormalize(mean_vals, norm_vals);
 
     // 初始化模型
-    printf("[%s] 正在加载模型...\n", GetTimestamp().c_str());
+    printf("[%s] 正在加载模型...\n", g_ntp.get_local_time_str().c_str());
     if (!ncnn.Init()) {
-        printf("[%s] 模型加载失败!\n", GetTimestamp().c_str());
+        printf("[%s] 模型加载失败!\n", g_ntp.get_local_time_str().c_str());
         return ;
     }
-    printf("[%s] 模型加载成功!\n\n", GetTimestamp().c_str());
+    printf("[%s] 模型加载成功!\n\n", g_ntp.get_local_time_str().c_str());
 
     // 读取测试图片
-    printf("[%s] 读取图片: %s\n", GetTimestamp().c_str(), test_image_path.c_str());
+    printf("[%s] 读取图片: %s\n", g_ntp.get_local_time_str().c_str(), test_image_path.c_str());
     cv::Mat image = cv::imread(test_image_path);
 
     if (image.empty()) {
@@ -118,13 +118,13 @@ void lq_ncnn_photo_demo(void)
         printf("请确保图片文件存在\n");
         return ;
     }
-    printf("[%s] 图片尺寸: %d x %d\n\n", GetTimestamp().c_str(), image.cols, image.rows);
+    printf("[%s] 图片尺寸: %d x %d\n\n", g_ntp.get_local_time_str().c_str(), image.cols, image.rows);
 
     // 注意: OpenCV读取的是BGR格式，但在推理时会自动转换为RGB格式以匹配训练时的输入
     // 训练使用PIL读取的RGB格式，因此需要色彩空间转换
 
     // 推理
-    printf("[%s] 开始推理...\n", GetTimestamp().c_str());
+    printf("[%s] 开始推理...\n", g_ntp.get_local_time_str().c_str());
     auto start = std::chrono::high_resolution_clock::now();
     std::string result = ncnn.Infer(image);
     auto end = std::chrono::high_resolution_clock::now();

@@ -22,12 +22,14 @@ public:
     ~lq_module_load();                                  // 析构函数
 
 public:
-    bool        set_load_module(const std::string _module_name);    // 设置加载模块
-    bool        set_unload_module(const std::string _module_name);  // 取消加载模块
+    bool        set_load_module(const std::string _module_name);    // 加载驱动模块
+    bool        set_unload_module(const std::string _module_name);  // 卸载驱动模块
 
-    void        set_unload_all_module();                            // 取消加载所有模块
+    void        set_unload_all_module();                            // 卸载所有模块
 
     bool        is_module_load(const std::string& _module);         // 检测模块是否已加载
+
+private:
     std::string get_module_name(const std::string& _input);         // 提纯模块名
     std::string execute_shell_commands(const std::string& _cmd);    // 执行终端 shell 指令并返回输出结果
 

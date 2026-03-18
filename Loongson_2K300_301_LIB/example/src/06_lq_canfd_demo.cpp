@@ -5,28 +5,26 @@
 #include <ctime>
 #include <chrono>
 
-// 获取当前时间戳字符串
-static std::string GetTimestamp()
-{
-    
-    auto now = std::chrono::system_clock::now();
-    auto ms  = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-    time_t t = std::chrono::system_clock::to_time_t(now);
-    tm* tm = localtime(&t);
-
-    std::stringstream ss;
-    ss << std::put_time(tm, "%Y-%m-%d %H:%M:%S") << "." << std::setfill('0') << std::setw(3) << ms.count();
-    return ss.str();
-}
+/********************************************************************************
+ * @file    lq_canfd_demo.cpp
+ * @brief   CANFD 测试.
+ * @author  龙邱科技-006
+ * @date    2026-01-10
+ * @version V2.1.0
+ * @note    适用与龙芯 2K0300/0301 平台.
+ *          本 demo 实现 CANFD 功能，用于测试 CANFD 控制器的基本功能.
+ ********************************************************************************/
 
 // CANFD对象
 ls_canfd g_can;
+// 时间获取对象
+static lq_ntp g_ntp;
 
 // CAN接收回调函数（在独立线程中运行）
 void CAN_RxCallback(const ls_canfd_frame_t &frame)
 {
     printf("[%s] 收到: CAN ID 0x%03X, 长度 %d, 数据: ", 
-           GetTimestamp().c_str(), frame.can_id, frame.len);
+           g_ntp.get_local_time_str().c_str(), frame.can_id, frame.len);
     for (int i = 0; i < frame.len; i++) {
         printf("%02X ", frame.data[i]);
     }
@@ -47,16 +45,12 @@ void lq_canfd_demo(void)
     // 主循环
     int count = 0;
     while (1) {
-        printf("[%s] 主程序运行中... count = %d\n", GetTimestamp().c_str(), count++);
-        
+        printf("[%s] 主程序运行中... count = %d\n", g_ntp.get_local_time_str().c_str(), count++);
         // 发送数据
         uint8_t tx_data[] = {0xDE, 0xAD, 0xBE, 0xEF, 0x11, 0x22, 0x33, 0x44};
         g_can.canfd_write_data(0x123, tx_data, sizeof(tx_data));
-        printf("[%s] 发送数据: CAN ID 0x123, 长度 %zu\n", 
-               GetTimestamp().c_str(), sizeof(tx_data));
-        
+        printf("[%s] 发送数据: CAN ID 0x123, 长度 %zu\n", g_ntp.get_local_time_str().c_str(), sizeof(tx_data));
         sleep(2);
     }
-
     return;
 }

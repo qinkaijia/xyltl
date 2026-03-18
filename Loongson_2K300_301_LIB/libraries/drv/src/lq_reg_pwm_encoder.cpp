@@ -84,6 +84,9 @@ float ls_encoder_pwm::encoder_get_count(void)
 {
     std::lock_guard<std::mutex> lock(this->mtx);
     uint32_t val = ls_readl(this->enc_pwm_full_buf);
+    if (val == 0) {
+        return 0.0f;
+    }
     return (float)(LS_ENC_PWM_CLK / val / LQ_NUM_ENCODER_LINE * (this->dir.gpio_level_get() * 2 - 1));
 }
 
