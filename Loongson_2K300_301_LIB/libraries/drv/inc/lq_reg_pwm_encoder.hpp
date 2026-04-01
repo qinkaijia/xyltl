@@ -4,6 +4,7 @@
 #include <iostream>
 #include <pthread.h>
 #include "lq_reg_gpio.hpp"
+#include "lq_clock.hpp"
 
 /****************************************************************************************************
  * @brief   宏参数定义
@@ -27,7 +28,7 @@
 #define LS_ENC_PWM_CTRL_RST             BIT(7)          // 计数器重置   （1--重置；0--正常工作）
 #define LS_ENC_PWM_CTRL_CAPTE           BIT(8)          // 测量脉冲使能 （1--测量脉冲；0--脉冲输出）
 
-#define LS_ENC_PWM_CLK                  ( 160000000.0 )  // PWM 控制器时钟周期
+#define LS_ENC_PWM_CLK                  ( LS_PMON_CLOCK_FREQ )  // PWM 控制器时钟周期
 
 /****************************************************************************************************
  * @brief   枚举值定义

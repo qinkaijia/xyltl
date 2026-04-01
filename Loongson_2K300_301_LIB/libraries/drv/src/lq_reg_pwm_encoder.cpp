@@ -87,7 +87,7 @@ float ls_encoder_pwm::encoder_get_count(void)
     if (val == 0) {
         return 0.0f;
     }
-    return (float)(LS_ENC_PWM_CLK / val / LQ_NUM_ENCODER_LINE * (this->dir.gpio_level_get() * 2 - 1));
+    return (float)((float)LS_ENC_PWM_CLK / val / LQ_NUM_ENCODER_LINE * (this->dir.gpio_level_get() * 2 - 1));
 }
 
 /********************************************************************************
