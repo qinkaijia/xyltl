@@ -42,6 +42,11 @@ void lsm6dsr_setgyro_rate(struct ls_i2c_dev *dev, u8 _rate)
  ********************************************************************************/
 uint8_t lq_i2c_lsm6dsr_init(struct ls_i2c_dev *dev)
 {
+    i2c_write_reg(dev, LSM6DSR_FUNC_CFG , 0x00);        // 关闭LSM6DSR嵌入式高级功能的配置寄存器组
+    i2c_write_reg(dev, LSM6DSR_CTRL3_C , 0x01);         // 关闭LSM6DSR控制寄存器组
+    delay_ms(100);   // 延时等待传感器启动完成
+    i2c_write_reg(dev, LSM6DSR_FUNC_CFG , 0x00);
+
     i2c_write_reg(dev, LSM6DSR_CTRL1_XL , RATE_833Hz);   // 设置加速度计回报率,注意不能太高 否则可能死机
     lsm6dsr_setacc_fullscale(dev, ACC_FS_XL_2G);         // acc,2g量程，分辨率高
     i2c_write_reg(dev, LSM6DSR_CTRL9_XL , 0x38);         // 使能加速度计x, y, z轴
@@ -72,12 +77,12 @@ uint8_t i2c_lsm6dsr_get_raw_data(struct ls_i2c_dev *dev, int16_t *ax, int16_t *a
     res = i2c_read_regs(dev, LSM6DSR_OUTX_L_GYRO, buf, 12);
     if (res == 0)
     {
-        *ax = ((int16_t)buf[0] << 8) | buf[1];
-        *ay = ((int16_t)buf[2] << 8) | buf[3];
-        *az = ((int16_t)buf[4] << 8) | buf[5];
-        *gx = ((int16_t)buf[6] << 8) | buf[7];
-        *gy = ((int16_t)buf[8] << 8) | buf[9];
-        *gz = ((int16_t)buf[10] << 8) | buf[11];
+        *ax = ((uint16_t)buf[1] << 8) | buf[0];
+        *ay = ((uint16_t)buf[3] << 8) | buf[2];
+        *az = ((uint16_t)buf[5] << 8) | buf[4];
+        *gx = ((uint16_t)buf[7] << 8) | buf[6];
+        *gy = ((uint16_t)buf[9] << 8) | buf[8];
+        *gz = ((uint16_t)buf[11]<< 8) | buf[10];
     }
     return res;
 }
