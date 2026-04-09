@@ -35,69 +35,69 @@ const uint8_t     JPEG_QUALITY = 30;
  ********************************************************************************/
 void lq_udp_img_trans_demo(void)
 {
-    printf("=========================================\r\n");
-    printf("  UDP Camera + Encoder Stream\r\n");
-    printf("=========================================\r\n");
-    printf("Target IP:   %s\r\n", TARGET_IP.c_str());
-    printf("Target Port: %d\r\n", TARGET_PORT);
-    printf("Resolution:  %dx%d\r\n", CAM_WIDTH, CAM_HEIGHT);
-    printf("FPS:         %d\r\n", CAM_FPS);
-    printf("=========================================\r\n");
+    // printf("=========================================\r\n");
+    // printf("  UDP Camera + Encoder Stream\r\n");
+    // printf("=========================================\r\n");
+    // printf("Target IP:   %s\r\n", TARGET_IP.c_str());
+    // printf("Target Port: %d\r\n", TARGET_PORT);
+    // printf("Resolution:  %dx%d\r\n", CAM_WIDTH, CAM_HEIGHT);
+    // printf("FPS:         %d\r\n", CAM_FPS);
+    // printf("=========================================\r\n");
 
-    // 初始化UDP客户端
-    lq_udp_client udp_client;
-    udp_client.udp_client_init(TARGET_IP, TARGET_PORT);
-    printf("UDP client initialized\r\n");
+    // // 初始化UDP客户端
+    // lq_udp_client udp_client;
+    // udp_client.udp_client_init(TARGET_IP, TARGET_PORT);
+    // printf("UDP client initialized\r\n");
 
-    // 初始化摄像头
-    lq_camera cam(CAM_WIDTH, CAM_HEIGHT, CAM_FPS);
-    if (!cam.is_opened()) {
-        printf("ERROR: Failed to open camera!\r\n");
-        return;
-    }
-    printf("Camera opened: %dx%d @ %dfps\r\n", cam.get_width(), cam.get_height(), cam.get_fps());
+    // // 初始化摄像头
+    // lq_camera cam(CAM_WIDTH, CAM_HEIGHT, CAM_FPS);
+    // if (!cam.is_opened()) {
+    //     printf("ERROR: Failed to open camera!\r\n");
+    //     return;
+    // }
+    // printf("Camera opened: %dx%d @ %dfps\r\n", cam.get_width(), cam.get_height(), cam.get_fps());
 
-    // 发送帧计数
-    uint32_t frame_count = 0;
-    uint32_t encoder_count = 0;
-    // 记录开始时间
-    auto start_time = std::chrono::high_resolution_clock::now();
+    // // 发送帧计数
+    // uint32_t frame_count = 0;
+    // uint32_t encoder_count = 0;
+    // // 记录开始时间
+    // auto start_time = std::chrono::high_resolution_clock::now();
 
-    printf("Start streaming... Press Ctrl+C to stop\r\n");
+    // printf("Start streaming... Press Ctrl+C to stop\r\n");
 
-    while (true) {
-        // ===================== 获取并发送图像 =====================
-        // 获取原始图像
-        cv::Mat frame = cam.get_raw_frame();
-        if (frame.empty()) {
-            printf("ERROR: Failed to read frame\r\n");
-            continue;
-        }
+    // while (true) {
+    //     // ===================== 获取并发送图像 =====================
+    //     // 获取原始图像
+    //     cv::Mat frame = cam.get_raw_frame();
+    //     if (frame.empty()) {
+    //         printf("ERROR: Failed to read frame\r\n");
+    //         continue;
+    //     }
 
-        // 在画面中间画方块
-        int rows = frame.rows;
-        int cols = frame.cols;
-        int x1 = (cols - RECT_SIZE) / 2;
-        int y1 = (rows - RECT_SIZE) / 2;
-        cv::rectangle(frame, cv::Point(x1, y1), cv::Point(x1 + RECT_SIZE, y1 + RECT_SIZE), cv::Scalar(0, 255, 0), 2);
+    //     // 在画面中间画方块
+    //     int rows = frame.rows;
+    //     int cols = frame.cols;
+    //     int x1 = (cols - RECT_SIZE) / 2;
+    //     int y1 = (rows - RECT_SIZE) / 2;
+    //     cv::rectangle(frame, cv::Point(x1, y1), cv::Point(x1 + RECT_SIZE, y1 + RECT_SIZE), cv::Scalar(0, 255, 0), 2);
 
-        // 发送JPEG压缩图像
-        ssize_t sent = udp_client.udp_send_image(frame, JPEG_QUALITY);
-        if (sent < 0) {
-            printf("ERROR: Failed to send image\r\n");
-        }
+    //     // 发送JPEG压缩图像
+    //     ssize_t sent = udp_client.udp_send_image(frame, JPEG_QUALITY);
+    //     if (sent < 0) {
+    //         printf("ERROR: Failed to send image\r\n");
+    //     }
 
-        frame_count++;
+    //     frame_count++;
 
-        // ===================== 每秒打印状态 =====================
-        auto now = std::chrono::high_resolution_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start_time).count();
-        if (elapsed >= 1) {
-            float fps = (float)frame_count / (float)elapsed;
-            printf("FPS: %.2f\r\n", fps);
-            frame_count = 0;
-            encoder_count = 0;
-            start_time = now;
-        }
-    }
+    //     // ===================== 每秒打印状态 =====================
+    //     auto now = std::chrono::high_resolution_clock::now();
+    //     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start_time).count();
+    //     if (elapsed >= 1) {
+    //         float fps = (float)frame_count / (float)elapsed;
+    //         printf("FPS: %.2f\r\n", fps);
+    //         frame_count = 0;
+    //         encoder_count = 0;
+    //         start_time = now;
+    //     }
+    // }
 }

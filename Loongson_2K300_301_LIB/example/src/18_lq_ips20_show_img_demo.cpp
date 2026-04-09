@@ -19,25 +19,19 @@
  ********************************************************************************/
 void lq_ips20_show_img_demo(void)
 {
-    cv::Mat frame;
+    cv::Mat frame, gray;
     lq_camera_ex cam(160, 120, 180);
 
     lq_ips20_drv_init(1);
     lq_ips20_drv_cls(U16BLUE);
+
+    // cam.set_exposure_manual(50); // 设置手动曝光
+
     sleep(1);
     while (1)
     {
-        cam.get_frame(frame);
+        // frame = cam.get_frame_raw();
+        cam.get_frame_raw_gray(frame, gray);
         lq_ips20_drv_road_color(0, 0, frame);
     }
-
-    // lq_camera cam(160, 120, 180);
-
-    // lq_ips20_drv_init(1);
-    // lq_ips20_drv_cls(U16BLUE);
-    // sleep(1);
-    // while (1)
-    // {
-    //     lq_ips20_drv_road_color(0, 0, cam.get_raw_frame());
-    // }
 }

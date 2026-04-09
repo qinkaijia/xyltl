@@ -16,6 +16,10 @@ int i2c_read_regs(struct ls_i2c_dev *dev, u8 reg, void *val, int len)
     struct i2c_msg msg[2];
     // 表示一个连接到 I2C 总线上的客户端设备
     struct i2c_client *cli = (struct i2c_client*)dev->client;
+    
+    unsigned long old_time_out = cli->adapter->timeout;
+    cli->adapter->timeout = msecs_to_jiffies(5);
+
     // 配置第一个消息(写消息)
     msg[0].addr = cli->addr;// cli 指向的 I2C 设备的地址
     msg[0].flags = 0;       // 消息标志位，表示一个写操作
@@ -28,6 +32,7 @@ int i2c_read_regs(struct ls_i2c_dev *dev, u8 reg, void *val, int len)
     msg[1].len = len;       // 消息长度为 len，即要从寄存器读取的字节数
     // 在 I2C 总线上进行数据传输
     ret = i2c_transfer(cli->adapter, msg, 2);
+    cli->adapter->timeout = old_time_out;
     if (ret == 2)
         ret = 0;
     else
@@ -47,12 +52,11 @@ int i2c_read_regs(struct ls_i2c_dev *dev, u8 reg, void *val, int len)
  ********************************************************************************/
 u8 i2c_read_reg_byte(struct ls_i2c_dev *dev, u8 reg)
 {
+    // 定义一个变量存储读取的数据
     u8 data = 0;
-    int ret = i2c_read_regs(dev, reg, &data, 1);
-    if (ret != 0) {
-        pr_err("i2c read reg byte error. ret = %d, reg = %06x\n", ret, reg);
-        return 0xFF;  // 通信失败返回特殊值 0xFF
-    }
+    // 调用上面的读取函数，将自定义结构体、要读取的寄存器地址、存储缓冲区、缓冲区长度传入函数中
+    i2c_read_regs(dev, reg, &data, 1);
+    // 返回数据
     return data;
 }
 
