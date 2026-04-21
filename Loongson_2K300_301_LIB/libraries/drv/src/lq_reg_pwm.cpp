@@ -9,8 +9,7 @@
  * @note    none.
  ********************************************************************************/
 ls_pwm::ls_pwm() : gpio(PIN_INVALID), mux(GPIO_MUX_INVALID), ch(PWM_CH_INVALID), pola(PWM_POL_INVALID),
-    period(0), duty(0), ref_count(std::make_shared<int>(0)),
-    pwm_base(nullptr), pwm_low_buf(nullptr), pwm_full_buf(nullptr), pwm_ctrl(nullptr)
+    period(0), duty(0), pwm_base(nullptr), pwm_low_buf(nullptr), pwm_full_buf(nullptr), pwm_ctrl(nullptr)
 {
 }
 
@@ -26,7 +25,7 @@ ls_pwm::ls_pwm() : gpio(PIN_INVALID), mux(GPIO_MUX_INVALID), ch(PWM_CH_INVALID),
  *          例如: 要设置周期为 50Hz, 周期值填入 50 即可.
  *          设置占空比的话, 无论周期是多少, 占空比范围都为 0 - 10000
  ********************************************************************************/
-ls_pwm::ls_pwm(pwm_pin_t _ch, uint32_t _period, uint32_t _duty, pwm_polarity_t _pola) : ref_count(std::make_shared<int>(1))
+ls_pwm::ls_pwm(pwm_pin_t _ch, uint32_t _period, uint32_t _duty, pwm_polarity_t _pola)
 {
     this->gpio = (gpio_pin_t)(_ch & 0xFF);
     this->ch   = (pwm_channel_t)((_ch >> 8) & 0x03);
@@ -152,64 +151,6 @@ void ls_pwm::pwm_disable(void)
 }
 
 /********************************************************************************
- * @brief   拷贝构造函数.
- * @param   other : 要拷贝的 PWM 实例.
- * @return  none.
- * @example ls_pwm MyPwm2(MyPwm);
- * @note    none.
- ********************************************************************************/
-ls_pwm::ls_pwm(const ls_pwm& other)
-{
-    // 加锁保护, 避免并发赋值时的竞态
-    std::lock_guard<std::mutex> lock_this(this->mtx);
-    std::lock_guard<std::mutex> lock_other(other.mtx);
-    // 拷贝所有硬件资源
-    this->gpio   = other.gpio;
-    this->ch     = other.ch;
-    this->mux    = other.mux;
-    this->pola   = other.pola;
-    this->period = other.period;
-    this->duty   = other.duty;
-    this->pwm_base     = other.pwm_base;
-    this->pwm_low_buf  = other.pwm_low_buf;
-    this->pwm_full_buf = other.pwm_full_buf;
-    this->pwm_ctrl     = other.pwm_ctrl;
-    // 共享引用计数(多个变量指向同一个计数)
-    this->ref_count = other.ref_count;
-    (*this->ref_count)++;
-}
-
-/********************************************************************************
- * @brief   拷贝赋值运算符重载.
- * @param   other : 要拷贝的 PWM 实例.
- * @return  none.
- * @example ls_pwm MyPwm2 = MyPwm;
- * @note    none.
- ********************************************************************************/
-ls_pwm& ls_pwm::operator=(const ls_pwm& other)
-{
-    if (this == &other) return *this;   // 防止自赋值
-    // 加锁保护, 避免并发赋值时的竞态
-    std::lock_guard<std::mutex> lock_this(this->mtx);
-    std::lock_guard<std::mutex> lock_other(other.mtx);
-    // 拷贝所有硬件资源
-    this->gpio   = other.gpio;
-    this->ch     = other.ch;
-    this->mux    = other.mux;
-    this->pola   = other.pola;
-    this->period = other.period;
-    this->duty   = other.duty;
-    this->pwm_base     = other.pwm_base;
-    this->pwm_low_buf  = other.pwm_low_buf;
-    this->pwm_full_buf = other.pwm_full_buf;
-    this->pwm_ctrl     = other.pwm_ctrl;
-    // 共享引用计数(多个变量指向同一个计数)
-    this->ref_count = other.ref_count;
-    (*this->ref_count)++;
-    return *this;
-}
-
-/********************************************************************************
  * @brief   析构函数.
  * @param   none.
  * @return  none.
@@ -217,19 +158,24 @@ ls_pwm& ls_pwm::operator=(const ls_pwm& other)
  ********************************************************************************/
 ls_pwm::~ls_pwm()
 {
+    if (this->pola == PWM_POL_NORMAL) {
+        this->pwm_set_duty(PWM_DUTY_MAX);
+    } else if (this->pola == PWM_POL_INV) {
+        this->pwm_set_duty(0);
+    }
     std::lock_guard<std::mutex> lock(this->mtx);
     this->pwm_disable();
-    if (this->ref_count && --(*this->ref_count) == 0)
+    if (this->pwm_base != nullptr)
     {
         LQ::ls_addr_munmap(this->pwm_base);
+        this->pwm_base    = this->pwm_full_buf = nullptr;
+        this->pwm_low_buf = this->pwm_ctrl     = nullptr;
+        this->gpio = PIN_INVALID;
+        this->mux  = GPIO_MUX_INVALID;
+        this->ch   = PWM_CH_INVALID;
+        this->pola = PWM_POL_INVALID;
+        this->period = this->duty = 0;
     }
-    this->pwm_base    = this->pwm_full_buf = nullptr;
-    this->pwm_low_buf = this->pwm_ctrl     = nullptr;
-    this->gpio = PIN_INVALID;
-    this->mux  = GPIO_MUX_INVALID;
-    this->ch   = PWM_CH_INVALID;
-    this->pola = PWM_POL_INVALID;
-    this->period = this->duty = 0;
 }
 
 /********************************************************************************

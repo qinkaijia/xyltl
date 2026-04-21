@@ -15,9 +15,6 @@
  *          本 demo 实现 CANFD 功能，用于测试 CANFD 控制器的基本功能.
  ********************************************************************************/
 
-// CANFD对象
-ls_canfd g_can;
-
 // 获取当前时间字符串（格式： YYYY-MM-DD HH:mm:ss）
 static std::string get_time_str(void)
 {
@@ -45,6 +42,9 @@ void CAN_RxCallback(const ls_canfd_frame_t &frame)
  ********************************************************************************/
 void lq_canfd_demo(void)
 {
+    // CANFD对象
+    ls_canfd g_can;
+
     // 初始化CAN，使用独立线程模式，接收回调函数为CAN_RxCallback
     if (!g_can.canfd_init(CAN1, CANFD_MODE_THREAD, CAN_RxCallback)) {
         printf("CAN初始化失败!\n");
@@ -56,7 +56,7 @@ void lq_canfd_demo(void)
 
     // 主循环
     int count = 0;
-    while (1) {
+    while (ls_system_running.load()) {
         printf("[%s] 主程序运行中... count = %d\n", get_time_str().c_str(), count++);
         // 发送数据
         uint8_t tx_data[] = {0xDE, 0xAD, 0xBE, 0xEF, 0x11, 0x22, 0x33, 0x44};

@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <cstdlib>
+#include <atomic>
 #include "lq_common.hpp"
 
 /********************************************************************************
@@ -14,5 +15,7 @@
  *          2. 当收到 SIGINT 信号 (Ctrl+C) 时, 会调用 cb 函数.
  ********************************************************************************/
 void lq_signal_set_exit_cb(lq_empty_cb_t cb);
+
+extern std::atomic<bool> ls_system_running;
 
 #endif

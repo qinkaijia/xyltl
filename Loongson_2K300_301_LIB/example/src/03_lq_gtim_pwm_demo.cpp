@@ -23,12 +23,8 @@ void lq_gtim_pwm_demo(void)
     ls_gtim_pwm pwm1(GTIM_PWM0_PIN87, 100, 2000);
     // 自定义极性的构造方式
     ls_gtim_pwm pwm2(GTIM_PWM1_PIN88, 100, 2000, GTIM_PWM_POL_NORMAL);
-    // 拷贝构造使用方法, 调用 pwm3 与调用 pwm1 同效
-    ls_gtim_pwm pwm3(pwm1);
-    // 拷贝赋值使用方法, 调用 pwm4 与调用 pwm2 同效
-    ls_gtim_pwm pwm4 = pwm2;
 
-    while (1)
+    while (ls_system_running.load())
     {
         pwm1.gtim_pwm_set_duty(1000);
         pwm2.gtim_pwm_set_duty(2000);

@@ -68,6 +68,8 @@ private:
 
     ls_adc_sing_mgmt(const ls_adc_sing_mgmt&) = delete;             // 禁止拷贝构造
     ls_adc_sing_mgmt& operator=(const ls_adc_sing_mgmt&) = delete;  // 禁止赋值
+    ls_adc_sing_mgmt(ls_adc_sing_mgmt&&) = delete;                  // 禁止移动构造
+    ls_adc_sing_mgmt& operator=(ls_adc_sing_mgmt&&) = delete;       // 禁止移动赋值
 
     /* 内部函数：ADC 硬件校准(必须步骤) */
     bool hard_calibrate(void);

@@ -119,7 +119,6 @@ private:
 
     mutable std::mutex   mtx;       // 其他操作互斥锁
     mutable std::mutex   enable_mtx;// PWM 使能互斥锁
-    std::shared_ptr<int> ref_count; // 引用计数互斥锁
 
 private:
     // ATIM 控制器基地址

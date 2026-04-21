@@ -24,7 +24,7 @@ void lq_pwm_demo(void)
     ls_pwm pwm3(PWM2_PIN66, 70, 2000);
     ls_pwm pwm4(PWM3_PIN67, 80, 2000);
 
-    while (1)
+    while (ls_system_running.load())
     {
         pwm1.pwm_set_duty(3000);
         pwm2.pwm_set_duty(3000);

@@ -22,5 +22,6 @@
 #include "lq_udp_client.hpp"
 #include "lq_ntp.hpp"
 #include "lq_signal_handle.hpp"
+#include "lq_fs_i2c.hpp"
 
 #endif

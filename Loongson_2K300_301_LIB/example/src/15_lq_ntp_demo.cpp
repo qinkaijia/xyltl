@@ -22,7 +22,7 @@ void lq_ntp_demo(void)
     // 初始化 NTP 时间同步
     lq_ntp ntp;
 
-    while(1)
+    while (ls_system_running.load())
     {
         std::cout << "获取秒数时间戳\t: " << ntp.get_local_time_s() << std::endl;
         std::cout << "获取毫秒时间戳\t: " << ntp.get_local_time_ms() << std::endl;

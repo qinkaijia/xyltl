@@ -35,7 +35,7 @@ void lq_timer_demo(void)
 
     timer.set_seconds_s(1, my_timer_callback);     // 设置定时器回调，1s执行一次
     // timer.set_seconds_ms(1000, my_timer_callback); // 设置定时器回调，1000ms执行一次
-    while (1)
+    while (ls_system_running.load())
     {
         usleep(100*100);
     }

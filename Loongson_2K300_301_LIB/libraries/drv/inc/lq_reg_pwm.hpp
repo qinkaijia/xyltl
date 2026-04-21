@@ -83,7 +83,13 @@ public:
     ~ls_pwm();  // 析构函数
     // 有参构造函数
     ls_pwm(pwm_pin_t _ch, uint32_t _period, uint32_t _duty, pwm_polarity_t _pola = PWM_POL_INV);
-    
+
+public:
+    ls_pwm(const ls_pwm& other) = delete;           // 拷贝构造
+    ls_pwm& operator=(const ls_pwm& other) = delete;// 拷贝赋值
+    ls_pwm(ls_pwm&& other) = delete;                // 移动构造
+    ls_pwm& operator=(ls_pwm&& other) = delete;     // 移动赋值
+
 public:
     void pwm_enable(void);  // 使能 PWM 通道
     void pwm_disable(void); // 失能 PWM 通道
@@ -91,9 +97,6 @@ public:
     void pwm_set_period(uint32_t _period);      // 设置 PWM 周期
     void pwm_set_duty(uint32_t _duty);          // 设置 PWM 占空比度
     void pwm_set_polarity(pwm_polarity_t _pola);// 设置 PWM 极性
-
-    ls_pwm(const ls_pwm& other);            // 拷贝构造
-    ls_pwm& operator=(const ls_pwm& other); // 拷贝赋值
     
 public:
     gpio_pin_t      pwm_get_gpio(void);     // 获取当前 PWM 所使用引脚
@@ -113,7 +116,7 @@ private:
 
     mutable std::mutex   mtx;       // 其他操作互斥锁
     mutable std::mutex   enable_mtx;// PWM 使能互斥锁
-    std::shared_ptr<int> ref_count; // 引用计数
+    
 private:
     // pwm 控制器总基地址
     static const ls_reg_base_t LS_PWM_BASE_ADDR = 0x1611B000;

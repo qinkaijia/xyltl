@@ -47,7 +47,7 @@ void lq_udp_wavefrom_demo(void)
 
     printf("Start streaming... Press Ctrl+C to stop\r\n");
 
-    while (true) {
+    while (ls_system_running.load()) {
         // ===================== 获取并发送编码器值 =====================
         // 读取编码器值
         float ch1 = enc1.encoder_get_count();

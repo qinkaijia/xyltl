@@ -12,7 +12,7 @@ static pthread_mutex_t ATIM_MUTEX = PTHREAD_MUTEX_INITIALIZER;
  * @note    none.
  ********************************************************************************/
 ls_atim_pwm::ls_atim_pwm() : gpio(PIN_INVALID), ch(ATIM_PWM_CH_INVALID), mux(GPIO_MUX_INVALID), pola(ATIM_PWM_POL_INVALID),
-    period(0), duty(0), ref_count(std::make_shared<int>(0)), atim_base(nullptr), atim_arr(nullptr), atim_ccrx(nullptr),
+    period(0), duty(0), atim_base(nullptr), atim_arr(nullptr), atim_ccrx(nullptr),
     atim_ccer(nullptr), atim_cnt(nullptr), atim_bdtr(nullptr), atim_egr(nullptr), atim_cr1(nullptr)
 {
     this->atim_ccmr[0] = nullptr;
@@ -31,8 +31,7 @@ ls_atim_pwm::ls_atim_pwm() : gpio(PIN_INVALID), ch(ATIM_PWM_CH_INVALID), mux(GPI
  *          例如: 要设置周期为 50Hz, 周期值填入 50 即可.
  *          设置占空比的话, 无论周期是多少, 占空比范围都为 0 - 10000
  ********************************************************************************/
-ls_atim_pwm::ls_atim_pwm(atim_pwm_pin_t _pin, uint32_t _period, uint32_t _duty, atim_pwm_polarity_t _pola) :
-    ref_count(std::make_shared<int>(1))
+ls_atim_pwm::ls_atim_pwm(atim_pwm_pin_t _pin, uint32_t _period, uint32_t _duty, atim_pwm_polarity_t _pola)
 {
     this->gpio = (gpio_pin_t)((_pin) & 0xFF);
     this->ch   = (atim_pwm_channel_t)((_pin>>8) & 0x03);
@@ -160,76 +159,6 @@ void ls_atim_pwm::atim_pwm_disable(void)
 }
 
 /********************************************************************************
- * @brief   拷贝构造函数.
- * @param   other : 要拷贝的 ATIM PWM 实例.
- * @return  none.
- * @example ls_atim_pwm MyPwm2(MyPwm);
- * @note    none.
- ********************************************************************************/
-ls_atim_pwm::ls_atim_pwm(const ls_atim_pwm& other)
-{
-    // 加锁保护, 避免并发赋值时的竞态
-    std::lock_guard<std::mutex> lock_this(this->mtx);
-    std::lock_guard<std::mutex> lock_other(other.mtx);
-    // 拷贝所有硬件资源
-    this->gpio   = other.gpio;
-    this->mux    = other.mux;
-    this->ch     = other.ch;
-    this->pola   = other.pola;
-    this->mode   = other.mode;
-    this->period = other.period;
-    this->duty   = other.duty;
-    // 寄存器资源
-    this->atim_base    = other.atim_base;
-    this->atim_arr     = other.atim_arr;
-    this->atim_ccrx    = other.atim_ccrx;
-    this->atim_ccmr[0] = other.atim_ccmr[0];
-    this->atim_ccmr[1] = other.atim_ccmr[1];
-    this->atim_cnt     = other.atim_cnt;
-    this->atim_egr     = other.atim_egr;
-    this->atim_cr1     = other.atim_cr1;
-    // 共享引用计数(多个变量指向同一个计数)
-    this->ref_count = other.ref_count;
-    (*this->ref_count)++;
-}
-
-/********************************************************************************
- * @brief   拷贝赋值运算符重载.
- * @param   other : 要拷贝的 ATIM PWM 实例.
- * @return  none.
- * @example ls_atim_pwm MyPwm2 = MyPwm;
- * @note    none.
- ********************************************************************************/
-ls_atim_pwm& ls_atim_pwm::operator=(const ls_atim_pwm& other)
-{
-    if (this == &other) return *this;   // 防止自赋值
-    // 加锁保护, 避免并发赋值时的竞态
-    std::lock_guard<std::mutex> lock_this(this->mtx);
-    std::lock_guard<std::mutex> lock_other(other.mtx);
-    // 拷贝所有硬件资源
-    this->gpio   = other.gpio;
-    this->mux    = other.mux;
-    this->ch     = other.ch;
-    this->pola   = other.pola;
-    this->mode   = other.mode;
-    this->period = other.period;
-    this->duty   = other.duty;
-    // 寄存器资源
-    this->atim_base    = other.atim_base;
-    this->atim_arr     = other.atim_arr;
-    this->atim_ccrx    = other.atim_ccrx;
-    this->atim_ccmr[0] = other.atim_ccmr[0];
-    this->atim_ccmr[1] = other.atim_ccmr[1];
-    this->atim_cnt     = other.atim_cnt;
-    this->atim_egr     = other.atim_egr;
-    this->atim_cr1     = other.atim_cr1;
-    // 共享引用计数(多个变量指向同一个计数)
-    this->ref_count = other.ref_count;
-    (*this->ref_count)++;
-    return *this;
-}
-
-/********************************************************************************
  * @brief   析构函数.
  * @param   none.
  * @return  none.
@@ -237,24 +166,28 @@ ls_atim_pwm& ls_atim_pwm::operator=(const ls_atim_pwm& other)
  ********************************************************************************/
 ls_atim_pwm::~ls_atim_pwm()
 {
+    if (this->pola == ATIM_PWM_POL_NORMAL) {
+        this->atim_pwm_set_duty(ATIM_PWM_DUTY_MAX);
+    } else if (this->pola == ATIM_PWM_POL_INV) {
+        this->atim_pwm_set_duty(0);
+    }
     std::lock_guard<std::mutex> lock(this->mtx);
     this->atim_pwm_disable();
-    if (this->ref_count && --(*this->ref_count) == 0)
-    {
+    if (this->atim_base != nullptr) {
         LQ::ls_addr_munmap(this->atim_base);
+        this->atim_base    = this->atim_arr     = nullptr;
+        this->atim_ccrx    = this->atim_ccmr[0] = nullptr;
+        this->atim_ccmr[1] = this->atim_ccer    = nullptr;
+        this->atim_cnt     = this->atim_egr     = nullptr;
+        this->atim_cr1     = this->atim_bdtr    = nullptr;
+        this->gpio = PIN_INVALID;
+        this->mux  = GPIO_MUX_INVALID;
+        this->ch   = ATIM_PWM_CH_INVALID;
+        this->pola = ATIM_PWM_POL_INVALID;
+        this->mode = ATIM_PWM_MODE_INVALID;
+        this->period = 0;
+        this->duty   = 0;
     }
-    this->atim_base    = this->atim_arr     = nullptr;
-    this->atim_ccrx    = this->atim_ccmr[0] = nullptr;
-    this->atim_ccmr[1] = this->atim_ccer    = nullptr;
-    this->atim_cnt     = this->atim_egr     = nullptr;
-    this->atim_cr1     = this->atim_bdtr    = nullptr;
-    this->gpio = PIN_INVALID;
-    this->mux  = GPIO_MUX_INVALID;
-    this->ch   = ATIM_PWM_CH_INVALID;
-    this->pola = ATIM_PWM_POL_INVALID;
-    this->mode = ATIM_PWM_MODE_INVALID;
-    this->period = 0;
-    this->duty   = 0;
 }
 
 /********************************************************************************

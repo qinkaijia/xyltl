@@ -1,5 +1,8 @@
 #include "lq_signal_handle.hpp"
 
+// 系统运行标志位
+std::atomic<bool> ls_system_running(true);
+
 extern "C" {
 
 // 自定义退出处理函数指针
@@ -21,7 +24,9 @@ static void __sigint_handler(int sig)
     }
     const char msg[] = "\n[LQ] [\033[32mEXIT\033[0m ] Ctrl+C 安全退出\n";
     write(STDOUT_FILENO, msg, sizeof(msg));
-    exit(0);
+    // 设置系统运行标志位为 false
+    ls_system_running.store(false);
+    // exit(0);
 }
 
 /********************************************************************************

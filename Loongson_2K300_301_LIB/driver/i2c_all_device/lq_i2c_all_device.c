@@ -31,11 +31,11 @@ static int __init dev_init(void)
     struct i2c_adapter *adapter = NULL;
     struct i2c_board_info i2c_board_info;
     int i = 0;
-    // 获取I2C总线适配器（当前使用第1个I2C总线适配器）
-    adapter = i2c_get_adapter(1);
+    // 获取I2C总线适配器（当前使用第5个I2C总线适配器）
+    adapter = i2c_get_adapter(5);
     if (!adapter)
     {
-        printk("LQ_I2C_ALL_DEV: get i2c adapter 1 failed!\n");
+        printk("LQ_I2C_ALL_DEV: get i2c adapter 5 failed!\n");
         return -ENODEV;
     }
     printk("LQ_I2C_ALL_DEV init function, start probe multi devices\n");

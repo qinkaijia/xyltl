@@ -25,7 +25,7 @@ void lq_mpu6050_demo(void)
 
     lq_i2c_mpu6050 mpu6050;
 
-    while (1)
+    while (ls_system_running.load())
     {
         mpu6050.get_mpu6050_gyro(&ax, &ay, &az, &gx, &gy, &gz);
         printf("ID = 0x%02x, ax=%05d, ay=%05d, az=%05d, gx=%05d, gy=%05d, gz=%05d\n\n", mpu6050.get_mpu6050_id(), ax, ay, az, gx, gy, gz);

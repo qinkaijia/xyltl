@@ -88,16 +88,19 @@ public:
     ls_gtim_pwm(gtim_pwm_pin_t _pin, uint32_t period, uint32_t duty, gtim_pwm_polarity_t _pola = GTIM_PWM_POL_INV);
 
 public:
+    ls_gtim_pwm(const ls_gtim_pwm& other) = delete;              // 禁用拷贝构造
+    ls_gtim_pwm(ls_gtim_pwm&& other) = delete;                   // 禁用移动构造
+    ls_gtim_pwm& operator=(const ls_gtim_pwm& other) = delete;   // 禁用拷贝赋值 
+    ls_gtim_pwm& operator=(ls_gtim_pwm&& other) = delete;        // 禁用移动赋值
+
+public:
     void gtim_pwm_enable(void);     // 使能 GTIM PWM 通道
     void gtim_pwm_disable(void);    // 失能 GTIM PWM 通道
 
     void gtim_pwm_set_period(uint32_t _period);             // 设置 GTIM PWM 周期
     void gtim_pwm_set_duty(uint32_t _duty);                 // 设置 GTIM PWM 占空比度
     void gtim_pwm_set_polarity(gtim_pwm_polarity_t _pola);  // 设置 GTIM PWM 极性
-    void gtim_pwm_set_mode(gtim_pwm_mode_t _mode);          // 设置 GTIM PWM 模式
-
-    ls_gtim_pwm(const ls_gtim_pwm& other);              // 拷贝构造
-    ls_gtim_pwm& operator=(const ls_gtim_pwm& other);   // 拷贝赋值  
+    void gtim_pwm_set_mode(gtim_pwm_mode_t _mode);          // 设置 GTIM PWM 模式 
 
 public:
     gpio_pin_t          gtim_pwm_get_gpio(void);        // 获取当前 GTIM PWM 所使用引脚
@@ -118,7 +121,6 @@ private:
 
     mutable std::mutex   mtx;       // 其他操作互斥锁
     mutable std::mutex   enable_mtx;// PWM 使能互斥锁
-    std::shared_ptr<int> ref_count; // 引用计数互斥锁
 
 private:
     // GTIM 控制器基地址

@@ -9,8 +9,7 @@
  * @note    none.
  ********************************************************************************/
 ls_encoder_pwm::ls_encoder_pwm() : gpio(PIN_INVALID), mux(GPIO_MUX_INVALID), ch(ENC_PWM_CH_INVALID),
-    enc_pwm_base(nullptr), enc_pwm_low_buf(nullptr), enc_pwm_full_buf(nullptr), enc_pwm_ctrl(nullptr),
-    ref_count(std::make_shared<int>(0))
+    enc_pwm_base(nullptr), enc_pwm_low_buf(nullptr), enc_pwm_full_buf(nullptr), enc_pwm_ctrl(nullptr)
 {
 }
 
@@ -22,8 +21,7 @@ ls_encoder_pwm::ls_encoder_pwm() : gpio(PIN_INVALID), mux(GPIO_MUX_INVALID), ch(
  * @example ls_encoder_pwm MyEncoder(ENC_PWM0_PIN64, PIN_72);
  * @note    none.
  ********************************************************************************/
-ls_encoder_pwm::ls_encoder_pwm(ls_enc_pwm_pin_t _pin, gpio_pin_t _dir)
-    : dir(_dir, GPIO_MODE_IN), ref_count(std::make_shared<int>(1))
+ls_encoder_pwm::ls_encoder_pwm(ls_enc_pwm_pin_t _pin, gpio_pin_t _dir) : dir(_dir, GPIO_MODE_IN)
 {
     this->gpio = (gpio_pin_t)((_pin) & 0xFF);
     this->mux  = (gpio_mux_mode_t)((_pin>>10) & 0x03);
@@ -91,60 +89,6 @@ float ls_encoder_pwm::encoder_get_count(void)
 }
 
 /********************************************************************************
- * @brief   拷贝构造函数.
- * @param   other : 要拷贝的 编码器 PWM 实例.
- * @return  none.
- * @example ls_encoder_pwm MyEncoder2(MyEncoder);
- * @note    none.
- ********************************************************************************/
-ls_encoder_pwm::ls_encoder_pwm(const ls_encoder_pwm& other)
-{
-    // 加锁保护, 避免并发赋值时的竞态
-    std::lock_guard<std::mutex> lock_this(this->mtx);
-    std::lock_guard<std::mutex> lock_other(other.mtx);
-    // 拷贝所有硬件资源
-    this->gpio = other.gpio;
-    this->mux  = other.mux;
-    this->ch   = other.ch;
-    // 寄存器资源
-    this->enc_pwm_base     = other.enc_pwm_base;
-    this->enc_pwm_low_buf  = other.enc_pwm_low_buf;
-    this->enc_pwm_full_buf = other.enc_pwm_full_buf;
-    this->enc_pwm_ctrl     = other.enc_pwm_ctrl;
-    // 共享引用计数(多个变量指向同一个计数)
-    this->ref_count = other.ref_count;
-    (*this->ref_count)++;
-}
-
-/********************************************************************************
- * @brief   拷贝赋值运算符重载.
- * @param   other : 要拷贝的 编码器 PWM 实例.
- * @return  none.
- * @example ls_encoder_pwm MyEncoder = MyEncoder;
- * @note    none.
- ********************************************************************************/
-ls_encoder_pwm& ls_encoder_pwm::operator=(const ls_encoder_pwm& other)
-{
-    if (this == &other) return *this;
-    // 加锁保护, 避免并发赋值时的竞态
-    std::lock_guard<std::mutex> lock_this(this->mtx);
-    std::lock_guard<std::mutex> lock_other(other.mtx);
-    // 拷贝所有硬件资源
-    this->gpio = other.gpio;
-    this->mux  = other.mux;
-    this->ch   = other.ch;
-    // 寄存器资源
-    this->enc_pwm_base     = other.enc_pwm_base;
-    this->enc_pwm_low_buf  = other.enc_pwm_low_buf;
-    this->enc_pwm_full_buf = other.enc_pwm_full_buf;
-    this->enc_pwm_ctrl     = other.enc_pwm_ctrl;
-    // 共享引用计数(多个变量指向同一个计数)
-    this->ref_count = other.ref_count;
-    (*this->ref_count)++;
-    return *this;
-}
-
-/********************************************************************************
  * @brief   析构函数
  * @param   none.
  * @return  none.
@@ -154,15 +98,15 @@ ls_encoder_pwm& ls_encoder_pwm::operator=(const ls_encoder_pwm& other)
 ls_encoder_pwm::~ls_encoder_pwm()
 {
     std::lock_guard<std::mutex> lock(this->mtx);
-    if (this->ref_count && --(*this->ref_count) == 0)
+    if (this->enc_pwm_base != nullptr)
     {
         LQ::ls_addr_munmap(this->enc_pwm_base);
+        this->enc_pwm_base     = this->enc_pwm_low_buf = nullptr;
+        this->enc_pwm_full_buf = this->enc_pwm_ctrl    = nullptr;
+        this->gpio = PIN_INVALID;
+        this->mux  = GPIO_MUX_INVALID;
+        this->ch   = ENC_PWM_CH_INVALID;
     }
-    this->enc_pwm_base     = this->enc_pwm_low_buf = nullptr;
-    this->enc_pwm_full_buf = this->enc_pwm_ctrl    = nullptr;
-    this->gpio = PIN_INVALID;
-    this->mux  = GPIO_MUX_INVALID;
-    this->ch   = ENC_PWM_CH_INVALID;
 }
 
 /********************************************************************************

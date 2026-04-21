@@ -65,7 +65,7 @@ void lq_udp_img_trans_demo(void)
 
     // printf("Start streaming... Press Ctrl+C to stop\r\n");
 
-    // while (true) {
+    // while (ls_system_running.load()) {
     //     // ===================== 获取并发送图像 =====================
     //     // 获取原始图像
     //     cv::Mat frame = cam.get_raw_frame();

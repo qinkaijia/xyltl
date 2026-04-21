@@ -22,7 +22,7 @@ void lq_gpio_output_demo(void)
     // 初始化 GPIO 引脚 74 为输出模式
     ls_gpio gpio(PIN_74, GPIO_MODE_OUT);
 
-    while (1)
+    while (ls_system_running.load())
     {
         gpio.gpio_level_set(GPIO_HIGH);
         usleep(5000);
@@ -43,7 +43,7 @@ void lq_gpio_input_demo(void)
     // 初始化 GPIO 引脚 74 为输入模式
     ls_gpio gpio(PIN_74, GPIO_MODE_IN);
 
-    while (1)
+    while (ls_system_running.load())
     {
         printf("gpio 77 value = %d\n", gpio.gpio_level_get());  // 获取并打印当前电平值
         usleep(5000);

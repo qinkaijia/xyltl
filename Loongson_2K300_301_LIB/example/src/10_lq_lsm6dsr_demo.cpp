@@ -25,7 +25,7 @@ void lq_lsm6dsr_demo(void)
 
     lq_i2c_lsm6dsr lsm6dsr;
 
-    while (1)
+    while (ls_system_running.load())
     {
         lsm6dsr.get_lsm6dsr_gyro(&ax, &ay, &az, &gx, &gy, &gz);
         printf("ID = 0x%02x, ax=%08d, ay=%08d, az=%08d, gx=%08d, gy=%08d, gz=%08d\n\n", lsm6dsr.get_lsm6dsr_id(), ax, ay, az, gx, gy, gz);

@@ -76,8 +76,10 @@ public:
     void  encoder_reset_counter(void);          // 重置编码器计数器
     void  encoder_close_reset_counter(void);    // 关闭重置编码器计数器
 
-    ls_encoder_pwm(const ls_encoder_pwm& other);            // 拷贝构造
-    ls_encoder_pwm& operator=(const ls_encoder_pwm& other); // 拷贝赋值
+    ls_encoder_pwm(const ls_encoder_pwm& other) = delete;            // 拷贝构造
+    ls_encoder_pwm& operator=(const ls_encoder_pwm& other) = delete; // 拷贝赋值
+    ls_encoder_pwm(ls_encoder_pwm&& other) = delete;                 // 移动构造
+    ls_encoder_pwm& operator=(ls_encoder_pwm&& other) = delete;      // 移动赋值
 
 public:
     gpio_pin_t        encoder_get_pulse(void);      // 获取脉冲引脚
@@ -92,7 +94,6 @@ private:
     enc_pwm_channel_t    ch;        // 编码器 PWM 通道
 
     mutable std::mutex   mtx;       // 互斥锁
-    std::shared_ptr<int> ref_count; // 引用计数
 
 private:
     // PWM 控制器基地址

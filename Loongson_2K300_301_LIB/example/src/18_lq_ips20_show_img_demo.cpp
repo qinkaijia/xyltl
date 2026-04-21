@@ -28,7 +28,7 @@ void lq_ips20_show_img_demo(void)
     // cam.set_exposure_manual(50); // 设置手动曝光
 
     sleep(1);
-    while (1)
+    while (ls_system_running.load())
     {
         // frame = cam.get_frame_raw();
         cam.get_frame_raw_gray(frame, gray);

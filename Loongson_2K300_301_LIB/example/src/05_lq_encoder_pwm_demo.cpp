@@ -23,7 +23,7 @@ void lq_encoder_pwm_demo(void)
     ls_encoder_pwm enc3(ENC_PWM2_PIN66, PIN_74);
     ls_encoder_pwm enc4(ENC_PWM3_PIN67, PIN_75);
 
-    while(1)
+    while(ls_system_running.load())
     {
         printf("encoder count1: %-6.2f\n", enc1.encoder_get_count());
         printf("encoder count2: %-6.2f\n", enc2.encoder_get_count());
