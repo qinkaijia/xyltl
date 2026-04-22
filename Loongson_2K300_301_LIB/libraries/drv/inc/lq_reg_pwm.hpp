@@ -4,6 +4,7 @@
 #include <iostream>
 #include "lq_reg_gpio.hpp"
 #include "lq_clock.hpp"
+#include "lq_common.hpp"
 
 /****************************************************************************************************
  * @brief   宏参数定义
@@ -76,7 +77,7 @@ typedef enum pwm_pin
  * @brief   类定义
  ****************************************************************************************************/
 
-class ls_pwm
+class ls_pwm : public lq_auto_cleanup
 {
 public:
     ls_pwm();   // 空构造函数
@@ -97,6 +98,8 @@ public:
     void pwm_set_period(uint32_t _period);      // 设置 PWM 周期
     void pwm_set_duty(uint32_t _duty);          // 设置 PWM 占空比度
     void pwm_set_polarity(pwm_polarity_t _pola);// 设置 PWM 极性
+
+    void cleanup(void) override; // 清理函数
     
 public:
     gpio_pin_t      pwm_get_gpio(void);     // 获取当前 PWM 所使用引脚

@@ -158,15 +158,26 @@ void ls_pwm::pwm_disable(void)
  ********************************************************************************/
 ls_pwm::~ls_pwm()
 {
-    if (this->pola == PWM_POL_NORMAL) {
-        this->pwm_set_duty(PWM_DUTY_MAX);
-    } else if (this->pola == PWM_POL_INV) {
-        this->pwm_set_duty(0);
-    }
-    std::lock_guard<std::mutex> lock(this->mtx);
-    this->pwm_disable();
+    this->cleanup();
+}
+
+/********************************************************************************
+ * @brief   清理 PWM 资源.
+ * @param   none.
+ * @return  none.
+ * @note    调用该函数后, 该 PWM 实例将无法再使用.
+ ********************************************************************************/
+void ls_pwm::cleanup()
+{
     if (this->pwm_base != nullptr)
     {
+        if (this->pola == PWM_POL_NORMAL) {
+            this->pwm_set_duty(PWM_DUTY_MAX);
+        } else if (this->pola == PWM_POL_INV) {
+            this->pwm_set_duty(0);
+        }
+        std::lock_guard<std::mutex> lock(this->mtx);
+        this->pwm_disable();
         LQ::ls_addr_munmap(this->pwm_base);
         this->pwm_base    = this->pwm_full_buf = nullptr;
         this->pwm_low_buf = this->pwm_ctrl     = nullptr;

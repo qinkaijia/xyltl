@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include "lq_reg_gpio.hpp"
 #include "lq_clock.hpp"
+#include "lq_common.hpp"
 
 /****************************************************************************************************
  * @brief   宏参数定义
@@ -80,7 +81,7 @@ typedef enum atim_pwm_pin
  * @brief   类定义
  ****************************************************************************************************/
 
-class ls_atim_pwm
+class ls_atim_pwm : public lq_auto_cleanup
 {
 public:
     ls_atim_pwm();   // 空构造函数
@@ -97,8 +98,12 @@ public:
     void atim_pwm_set_polarity(atim_pwm_polarity_t _pola);  // 设置 ATIM PWM 极性
     void atim_pwm_set_mode(atim_pwm_mode_t _mode);          // 设置 ATIM PWM 模式
 
-    ls_atim_pwm(const ls_atim_pwm& other);              // 拷贝构造
-    ls_atim_pwm& operator=(const ls_atim_pwm& other);   // 拷贝赋值  
+    void cleanup() override;        // 清理函数
+
+    ls_atim_pwm(const ls_atim_pwm& other) = delete;             // 拷贝构造
+    ls_atim_pwm(ls_atim_pwm&& other)      = delete;             // 移动构造
+    ls_atim_pwm& operator=(const ls_atim_pwm& other) = delete;  // 拷贝赋值
+    ls_atim_pwm& operator=(ls_atim_pwm&& other)      = delete;  // 移动赋值
 
 public:
     gpio_pin_t          atim_pwm_get_gpio(void);        // 获取当前 ATIM PWM 所使用引脚

@@ -164,14 +164,25 @@ void ls_gtim_pwm::gtim_pwm_disable(void)
  ********************************************************************************/
 ls_gtim_pwm::~ls_gtim_pwm()
 {
-    if (this->pola == GTIM_PWM_POL_NORMAL) {
-        this->gtim_pwm_set_duty(GTIM_PWM_DUTY_MAX);
-    } else if (this->pola == GTIM_PWM_POL_INV) {
-        this->gtim_pwm_set_duty(0);
-    }
-    std::lock_guard<std::mutex> lock(this->mtx);
-    this->gtim_pwm_disable();
+    this->cleanup();
+}
+
+/********************************************************************************
+ * @brief   清理函数.
+ * @param   none.
+ * @return  none.
+ * @note    清理函数, 用于关闭 GTIM PWM 通道, 并释放 Gtim 控制器基地址映射.
+ ********************************************************************************/
+void ls_gtim_pwm::cleanup()
+{
     if (this->gtim_base != nullptr) {
+        if (this->pola == GTIM_PWM_POL_NORMAL) {
+            this->gtim_pwm_set_duty(GTIM_PWM_DUTY_MAX);
+        } else if (this->pola == GTIM_PWM_POL_INV) {
+            this->gtim_pwm_set_duty(0);
+        }
+        std::lock_guard<std::mutex> lock(this->mtx);
+        this->gtim_pwm_disable();
         LQ::ls_addr_munmap(this->gtim_base);
         this->gtim_base    = this->gtim_arr     = nullptr;
         this->gtim_ccrx    = this->gtim_ccmr[0] = nullptr;

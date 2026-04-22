@@ -79,7 +79,7 @@ typedef enum gtim_pwm_pin
  * @brief   类定义
  ****************************************************************************************************/
 
-class ls_gtim_pwm
+class ls_gtim_pwm : public lq_auto_cleanup
 {
 public:
     ls_gtim_pwm();   // 空构造函数
@@ -100,7 +100,9 @@ public:
     void gtim_pwm_set_period(uint32_t _period);             // 设置 GTIM PWM 周期
     void gtim_pwm_set_duty(uint32_t _duty);                 // 设置 GTIM PWM 占空比度
     void gtim_pwm_set_polarity(gtim_pwm_polarity_t _pola);  // 设置 GTIM PWM 极性
-    void gtim_pwm_set_mode(gtim_pwm_mode_t _mode);          // 设置 GTIM PWM 模式 
+    void gtim_pwm_set_mode(gtim_pwm_mode_t _mode);          // 设置 GTIM PWM 模式
+
+    void cleanup() override;        // 清理函数
 
 public:
     gpio_pin_t          gtim_pwm_get_gpio(void);        // 获取当前 GTIM PWM 所使用引脚

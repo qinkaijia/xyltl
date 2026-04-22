@@ -166,14 +166,25 @@ void ls_atim_pwm::atim_pwm_disable(void)
  ********************************************************************************/
 ls_atim_pwm::~ls_atim_pwm()
 {
-    if (this->pola == ATIM_PWM_POL_NORMAL) {
-        this->atim_pwm_set_duty(ATIM_PWM_DUTY_MAX);
-    } else if (this->pola == ATIM_PWM_POL_INV) {
-        this->atim_pwm_set_duty(0);
-    }
-    std::lock_guard<std::mutex> lock(this->mtx);
-    this->atim_pwm_disable();
+    this->cleanup();
+}
+
+/********************************************************************************
+ * @brief   清理函数.
+ * @param   none.
+ * @return  none.
+ * @note    清理函数, 用于在对象生命周期结束时, 关闭 ATIM PWM 通道并释放 Atim 控制器基地址映射.
+ ********************************************************************************/
+void ls_atim_pwm::cleanup()
+{
     if (this->atim_base != nullptr) {
+        if (this->pola == ATIM_PWM_POL_NORMAL) {
+            this->atim_pwm_set_duty(ATIM_PWM_DUTY_MAX);
+        } else if (this->pola == ATIM_PWM_POL_INV) {
+            this->atim_pwm_set_duty(0);
+        }
+        std::lock_guard<std::mutex> lock(this->mtx);
+        this->atim_pwm_disable();
         LQ::ls_addr_munmap(this->atim_base);
         this->atim_base    = this->atim_arr     = nullptr;
         this->atim_ccrx    = this->atim_ccmr[0] = nullptr;
