@@ -8,7 +8,7 @@
  * @example lq_tcp_client MyClient;
  * @note    none.
  ********************************************************************************/
-lq_tcp_client::lq_tcp_client() noexcept : socket_fd_(-1), ref_count_(std::make_shared<int>(0))
+lq_tcp_client::lq_tcp_client() noexcept : socket_fd_(-1)
 {
 }
 
@@ -20,47 +20,9 @@ lq_tcp_client::lq_tcp_client() noexcept : socket_fd_(-1), ref_count_(std::make_s
  * @example lq_tcp_client MyClient("197.168.1.100", 8080);
  * @note    none.
  ********************************************************************************/
-lq_tcp_client::lq_tcp_client(const std::string _ip, uint16_t _port) : socket_fd_(-1), ref_count_(std::make_shared<int>(0))
+lq_tcp_client::lq_tcp_client(const std::string _ip, uint16_t _port) : socket_fd_(-1)
 {
     this->tcp_client_init(_ip, _port);
-}
-
-/********************************************************************************
- * @brief   复制构造函数.
- * @param   _other : 右值引用.
- * @return  none.
- * @example lq_tcp_client MyClient(otherClient);
- * @note    none.
- ********************************************************************************/
-lq_tcp_client::lq_tcp_client(const lq_tcp_client &_other) noexcept : socket_fd_(_other.socket_fd_)
-{
-    // 加锁保护, 避免并发赋值时的竞态
-    std::lock_guard<std::mutex> lock(this->mtx_);
-    std::lock_guard<std::mutex> lock_other(_other.mtx_);
-    // 共享引用计数(多个变量指向同一个计数)
-    this->ref_count_ = _other.ref_count_;
-    (*this->ref_count_)++;
-}
-
-/********************************************************************************
- * @brief   赋值运算符重载.
- * @param   _other : 右值引用.
- * @return  none.
- * @example MyClient = otherClient;
- * @note    none.
- ********************************************************************************/
-lq_tcp_client &lq_tcp_client::operator=(const lq_tcp_client &_other) noexcept
-{
-    // 加锁保护, 避免并发赋值时的竞态
-    std::lock_guard<std::mutex> lock(this->mtx_);
-    std::lock_guard<std::mutex> lock_other(_other.mtx_);
-    if (this != &_other) {
-        this->socket_fd_ = _other.socket_fd_;
-        // 共享引用计数(多个变量指向同一个计数)
-        this->ref_count_ = _other.ref_count_;
-        (*this->ref_count_)++;
-    }
-    return *this;
 }
 
 /********************************************************************************
@@ -117,9 +79,10 @@ void lq_tcp_client::tcp_client_init(const std::string _ip, uint16_t _port)
         this->socket_fd_ = -1;
         return;
     }
-    // 引用计数增加
-    (*this->ref_count_)++;
-    lq_log_info("TCP client init success, ip: %s, port: %d", _ip.c_str(), _port);
+    // 记录IP地址和端口号
+    this->ip_ = _ip;
+    this->port_ = _port;
+    lq_log_info("TCP client init success, ip: %s, port: %d", this->ip_.c_str(), this->port_);
 }
 
 /********************************************************************************
@@ -205,13 +168,9 @@ void lq_tcp_client::tcp_close() noexcept
 {
     // 加锁保护, 避免并发关闭时的竞态
     std::lock_guard<std::mutex> lock(this->mtx_);
-    if (*this->ref_count_ == 1) {
+    if (this->socket_fd_ >= 0) {
         close(this->socket_fd_);
         this->socket_fd_ = -1;
-        // 引用计数减少
-        (*this->ref_count_)--;
-    } else {
-        (*this->ref_count_)--;
     }
 }
 
@@ -224,5 +183,5 @@ void lq_tcp_client::tcp_close() noexcept
  ********************************************************************************/
 bool lq_tcp_client::is_connected() const noexcept
 {
-    return (this->socket_fd_ >= 0 && (*this->ref_count_) > 0 && this->ref_count_ != nullptr);
+    return this->socket_fd_ >= 0;
 }

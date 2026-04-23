@@ -19,8 +19,10 @@ public:
     lq_tcp_client() noexcept;                               // 默认构造函数
     lq_tcp_client(const std::string _ip, uint16_t _port);   // 有参构造函数
 
-    lq_tcp_client(const lq_tcp_client &_other) noexcept;            // 复制构造函数
-    lq_tcp_client &operator=(const lq_tcp_client &_other) noexcept; // 赋值运算符重载
+    lq_tcp_client(const lq_tcp_client &_other) = delete;            // 复制构造函数
+    lq_tcp_client(lq_tcp_client &&_other)      = delete;            // 移动构造函数
+    lq_tcp_client &operator=(const lq_tcp_client &_other) = delete; // 赋值运算符重载
+    lq_tcp_client &operator=(lq_tcp_client &&_other)      = delete; // 移动赋值运算符重载
 
     ~lq_tcp_client() noexcept;                              // 析构函数
 
@@ -39,8 +41,9 @@ private:
 
 private:
     int                  socket_fd_;    // 套接字文件描述符
+    std::string          ip_;           // 服务器IP地址
+    uint16_t             port_;         // 端口号
     mutable std::mutex   mtx_;          // 互斥锁，用于保护socket_fd_
-    std::shared_ptr<int> ref_count_;    // 引用计数，用于自动管理内存
 
 };
 
