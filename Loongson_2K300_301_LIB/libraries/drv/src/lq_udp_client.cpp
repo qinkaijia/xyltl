@@ -8,7 +8,7 @@
  * @example lq_udp_client MyClient;
  * @note    none.
  ********************************************************************************/
-lq_udp_client::lq_udp_client() noexcept : socket_fd_(-1), ref_count_(std::make_shared<int>(0))
+lq_udp_client::lq_udp_client() noexcept : socket_fd_(-1)
 {
 }
 
@@ -20,49 +20,9 @@ lq_udp_client::lq_udp_client() noexcept : socket_fd_(-1), ref_count_(std::make_s
  * @example lq_udp_client MyClient("197.168.1.100", 8080);
  * @note    none.
  ********************************************************************************/
-lq_udp_client::lq_udp_client(const std::string _ip, uint16_t _port) : socket_fd_(-1), ref_count_(std::make_shared<int>(0))
+lq_udp_client::lq_udp_client(const std::string _ip, uint16_t _port) : socket_fd_(-1)
 {
     this->udp_client_init(_ip, _port);
-}
-
-/********************************************************************************
- * @brief   复制构造函数.
- * @param   _other : 右值引用.
- * @return  none.
- * @example lq_udp_client MyClient(otherClient);
- * @note    none.
- ********************************************************************************/
-lq_udp_client::lq_udp_client(const lq_udp_client &_other) noexcept : socket_fd_(_other.socket_fd_)
-{
-    // 加锁保护, 避免并发赋值时的竞态
-    std::lock_guard<std::mutex> lock(this->mtx_);
-    std::lock_guard<std::mutex> lock_other(_other.mtx_);
-    this->addr_ = _other.addr_;
-    // 共享引用计数(多个变量指向同一个计数)
-    this->ref_count_ = _other.ref_count_;
-    (*this->ref_count_)++;
-}
-
-/********************************************************************************
- * @brief   赋值运算符重载.
- * @param   _other : 右值引用.
- * @return  none.
- * @example MyClient = otherClient;
- * @note    none.
- ********************************************************************************/
-lq_udp_client &lq_udp_client::operator=(const lq_udp_client &_other) noexcept
-{
-    // 加锁保护, 避免并发赋值时的竞态
-    std::lock_guard<std::mutex> lock(this->mtx_);
-    std::lock_guard<std::mutex> lock_other(_other.mtx_);
-    if (this != &_other) {
-        this->socket_fd_ = _other.socket_fd_;
-        this->addr_ = _other.addr_;
-        // 共享引用计数(多个变量指向同一个计数)
-        this->ref_count_ = _other.ref_count_;
-        (*this->ref_count_)++;
-    }
-    return *this;
 }
 
 /********************************************************************************
@@ -112,8 +72,9 @@ void lq_udp_client::udp_client_init(const std::string _ip, uint16_t _port)
         this->socket_fd_ = -1;
         return;
     }
-    // 引用计数增加
-    (*this->ref_count_)++;
+    // 记录IP地址和端口号
+    this->ip_ = _ip;
+    this->port_ = _port;
     lq_log_info("UDP client init success, ip: %s, port: %d", _ip.c_str(), _port);
 }
 
@@ -240,6 +201,7 @@ ssize_t lq_udp_client::udp_send_image(const cv::Mat &_img, int _quality)
  ********************************************************************************/
 int lq_udp_client::get_udp_socket_fd() const noexcept
 {
+    std::lock_guard<std::mutex> lock(this->mtx_);
     return this->socket_fd_;
 }
 
@@ -254,12 +216,8 @@ void lq_udp_client::udp_close() noexcept
 {
     // 加锁保护, 避免并发关闭时的竞态
     std::lock_guard<std::mutex> lock(this->mtx_);
-    if (*this->ref_count_ == 1) {
+    if (this->socket_fd_ >= 0) {
         close(this->socket_fd_);
         this->socket_fd_ = -1;
-        // 引用计数减少
-        (*this->ref_count_)--;
-    } else {
-        (*this->ref_count_)--;
     }
 }
