@@ -21,8 +21,8 @@
 ls_uart::ls_uart(const std::string& _path, speed_t _baud, ls_uart_stop_bits_t _stop, ls_uart_data_bits_t _data, ls_uart_parity_t _parity)
     : fd(-1), dev_path(_path), buadrate(_baud), stop_bits(_stop), data_bits(_data), parity(_parity)
 {
-    // 打开串口设备文件,O_RDWR->读写 | O_NOCTTY->不设为控制终端 | O_NDELAY->非阻塞
-    this->fd = open(_path.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
+    // 打开串口设备文件,O_RDWR->读写 | O_NOCTTY->不设为控制终端
+    this->fd = open(_path.c_str(), O_RDWR | O_NOCTTY);
     if (this->fd < 0) {
         lq_log_error("Open %s filed", _path.c_str());
     }
@@ -66,13 +66,14 @@ ls_uart::ls_uart(const std::string& _path, speed_t _baud, ls_uart_stop_bits_t _s
         default: lq_log_error("Invalid stop bits"); break;
     }
     // 设置超时
-    this->ts.c_cc[VMIN] = 0;    // 最小读取 0 字节
-    this->ts.c_cc[VTIME] = 5;   // 超时时间 0.5s
+    this->ts.c_cc[VMIN]  = 0;   // 最小读取 1 字节
+    this->ts.c_cc[VTIME] = 5;   // 阻塞
     // 应用配置(TCSANOW: 立即生效)
     if (tcsetattr(this->fd, TCSANOW, &this->ts) != 0) {
         lq_log_error("tcsetattr failed");
     }
-    // 清空缓冲区(避免就数据干扰)
+    fcntl(this->fd, F_SETFL, 0);
+    // 清空缓冲区(避免旧数据干扰)
     this->flush_buffer();
 }
 
@@ -93,6 +94,8 @@ ssize_t ls_uart::write_data(const uint8_t* _buf, size_t _len)
     ssize_t ret = write(this->fd, _buf, _len);
     if (ret < 0) {
         lq_log_error("Write failed");
+    } else {
+        tcdrain(this->fd);
     }
     return ret;
 }
@@ -139,6 +142,7 @@ void ls_uart::close_serial(void)
 bool ls_uart::flush_buffer(void)
 {
     if (this->fd < 0) return false;
+    tcdrain(this->fd);
     return tcflush(this->fd, TCIOFLUSH) == 0;
 }
 
