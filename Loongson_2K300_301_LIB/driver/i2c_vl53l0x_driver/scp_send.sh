@@ -74,7 +74,7 @@ fi
 # 发送.ko文件（使用scp）
 blue_echo "✅ 第二步：开始发送.ko文件到 $TARGET_IP..."
 for ko in $KO_FILES; do
-    scp "$ko" "$REMOTE_USER@$TARGET_IP:$REMOTE_DIR"
+    scp -O "$ko" "$REMOTE_USER@$TARGET_IP:$REMOTE_DIR"
     if [ $? -eq 0 ]; then
         green_echo "✅ 成功发送：$(basename $ko)"
     else
