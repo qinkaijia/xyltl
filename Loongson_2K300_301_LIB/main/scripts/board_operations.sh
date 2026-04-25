@@ -79,6 +79,7 @@ function stop_remote_program() {
 ##################################################
 function run_remote_program() {
     local board_ip=$1
+    local REMOTE_EXEC_CMD="${BOARD_TARGET_PATH}/${EXECUTABLE_NAME}"
     log_info "==================== 远程执行程序 ===================="
     log_info "🔧 开始在开发板 ${board_ip} 执行程序：${REMOTE_EXEC_CMD}"
     # 创建远程执行的临时脚本（去掉ldd检查）
