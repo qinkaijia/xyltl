@@ -23,5 +23,6 @@
 #include "lq_ntp.hpp"
 #include "lq_signal_handle.hpp"
 #include "lq_fs_i2c.hpp"
+#include "lq_net_image_trans.hpp"
 
 #endif

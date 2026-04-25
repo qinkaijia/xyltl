@@ -27,25 +27,25 @@ const uint16_t    TARGET_PORT  = 8080;
  ********************************************************************************/
 void lq_udp_wavefrom_demo(void)
 {
-    printf("=========================================\r\n");
-    printf("  UDP Encoder Stream\r\n");
-    printf("=========================================\r\n");
-    printf("Target IP:   %s\r\n", TARGET_IP.c_str());
-    printf("Target Port: %d\r\n", TARGET_PORT);
-    printf("=========================================\r\n");
+    printf("=========================================\n");
+    printf("  UDP 编码器数据传输\n");
+    printf("=========================================\n");
+    printf("Target IP:   %s\n", TARGET_IP.c_str());
+    printf("Target Port: %d\n", TARGET_PORT);
+    printf("=========================================\n");
 
     // 初始化UDP客户端
     lq_udp_client udp_client;
     udp_client.udp_client_init(TARGET_IP, TARGET_PORT);
-    printf("UDP client initialized\r\n");
+    printf("UDP client initialized\n");
 
     // 初始化编码器 (ENC_PWM0_PIN64, PIN_73)
     // 根据实际硬件接线修改引脚
     ls_encoder_pwm enc1(ENC_PWM0_PIN64, PIN_72);
     ls_encoder_pwm enc2(ENC_PWM1_PIN65, PIN_73);  // 如果有第二个编码器
-    printf("Encoder initialized\r\n");
+    printf("Encoder initialized\n");
 
-    printf("Start streaming... Press Ctrl+C to stop\r\n");
+    printf("Start streaming... Press Ctrl+C to stop\n");
 
     while (ls_system_running.load()) {
         // ===================== 获取并发送编码器值 =====================
@@ -64,7 +64,7 @@ void lq_udp_wavefrom_demo(void)
         udp_client.udp_send_string(encoder_str);
 
         // ===================== 打印状态 =====================
-        printf("Encoder: %s\r\n", encoder_str);
+        printf("Encoder: %s\n", encoder_str);
         usleep(100*100);
     }
 }
