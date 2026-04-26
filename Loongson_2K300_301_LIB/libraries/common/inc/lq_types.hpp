@@ -20,6 +20,12 @@ typedef volatile ls_reg64_t*    ls_reg64_addr_t;    // 64 位寄存器地址/指
 typedef uint32_t                ls_reg_off_t;       // 寄存器偏移量类型
 typedef uintptr_t               ls_reg_base_t;      // 通用寄存器基地址类型
 
+#define SET     1
+#define RESET   0
+
+#define HIGH    1
+#define LOW     0
+
 /********************************************************************************
  * @brief   通用寄存器地址计算宏
  * @param   base_ptr : 寄存器基地址.

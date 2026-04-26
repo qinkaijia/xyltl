@@ -1,4 +1,5 @@
 #include "lq_utils.hpp"
+#include <time.h>
 
 /********************************************************************************
  * @brief   通用模板: 判断数值是否在 [min_val, max_val] 闭区间范围内
@@ -30,3 +31,44 @@ template bool is_value_in_range<int16_t>(const int16_t&, const int16_t&, const i
 template bool is_value_in_range<int32_t>(const int32_t&, const int32_t&, const int32_t&);
 template bool is_value_in_range<int64_t>(const int64_t&, const int64_t&, const int64_t&);
 
+template bool is_value_in_range<float>(const float&, const float&, const float&);
+
+/******************************************************************************** 
+ * @brief   通用模板：限幅函数.
+ * @param   value   : 需要限幅的参数.
+ * @param   min_val : 限幅最小值.
+ * @param   max_val : 限幅最大值.
+ * @return  限幅后的参数.
+ * @note    输入值小于最小值 → 返回最小值
+ * @note    输入值大于最大值 → 返回最大值
+ * @note    输入值在区间内 → 直接返回原值
+ ********************************************************************************/
+template <typename T>
+T lq_limit(const T value, const T min_val, const T max_val)
+{
+    return (value < min_val) ? min_val : (value > max_val) ? max_val : value;
+}
+template uint8_t  lq_limit<uint8_t >(const uint8_t , const uint8_t , const uint8_t );
+template uint16_t lq_limit<uint16_t>(const uint16_t, const uint16_t, const uint16_t);
+template uint32_t lq_limit<uint32_t>(const uint32_t, const uint32_t, const uint32_t);
+template uint64_t lq_limit<uint64_t>(const uint64_t, const uint64_t, const uint64_t);
+
+template int8_t  lq_limit<int8_t >(const int8_t , const int8_t , const int8_t );
+template int16_t lq_limit<int16_t>(const int16_t, const int16_t, const int16_t);
+template int32_t lq_limit<int32_t>(const int32_t, const int32_t, const int32_t);
+template int64_t lq_limit<int64_t>(const int64_t, const int64_t, const int64_t);
+
+template float lq_limit<float>(const float, const float, const float);
+
+/******************************************************************************** 
+ * @brief   获取当前时间毫秒级.
+ * @param   none.
+ * @return  当前时间毫秒级.
+ * @note    该值为从程序启动到当前时间的毫秒数.
+ ********************************************************************************/
+uint32_t lq_get_tick_ms(void)
+{
+    static struct timespec lq_tick_ms_ts;
+    clock_gettime(CLOCK_MONOTONIC_COARSE, &lq_tick_ms_ts);
+    return (uint32_t)(lq_tick_ms_ts.tv_sec * 1000 + lq_tick_ms_ts.tv_nsec / 1000000);
+}

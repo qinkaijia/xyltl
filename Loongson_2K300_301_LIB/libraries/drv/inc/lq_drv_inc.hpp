@@ -24,5 +24,6 @@
 #include "lq_signal_handle.hpp"
 #include "lq_fs_i2c.hpp"
 #include "lq_net_image_trans.hpp"
+// #include "lq_reg_uart.hpp"
 
 #endif

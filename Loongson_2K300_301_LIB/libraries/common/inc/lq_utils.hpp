@@ -11,4 +11,12 @@
 template <typename T>
 bool is_value_in_range(const T& value, const T& min_val, const T& max_val);
 
+/* 通用模板：限幅函数 */
+
+template <typename T>
+T lq_limit(const T value, const T min_val, const T max_val);
+
+/* 获取当前时间毫秒级 */
+uint32_t lq_get_tick_ms(void);
+
 #endif
