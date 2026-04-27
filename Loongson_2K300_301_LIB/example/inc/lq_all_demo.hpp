@@ -26,5 +26,6 @@ void lq_timer_demo(void);           // 定时器回调测试
 void lq_module_load_demo(void);     // 模块加载函数测试
 void lq_ips20_show_img_demo(void);  // IPS20 显示图像测试
 void lq_http_img_trans_demo(void);  // HTTP 图像传输测试
+void lq_uart_demo(void);            // UART 通信测试
 
 #endif

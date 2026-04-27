@@ -36,6 +36,8 @@
 
 int main()
 {
+    lq_uart_demo();
+
     while (ls_system_running.load())
     {
         usleep(100*1000);
