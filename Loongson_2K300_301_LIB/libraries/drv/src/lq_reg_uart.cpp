@@ -12,7 +12,7 @@
  * @return  none.
  * @note    none.
  ********************************************************************************/
-ls_uarts::ls_uarts(uart_pin_t _pin, uint32_t _baud, ls_uart_data_bits_t _data, ls_uart_stop_bits_t _stop, ls_uart_parity_t _parity) :
+ls_uart::ls_uart(uart_pin_t _pin, uint32_t _baud, ls_uart_data_bits_t _data, ls_uart_stop_bits_t _stop, ls_uart_parity_t _parity) :
     uart_reg(nullptr), rx_pin(PIN_INVALID), tx_pin(PIN_INVALID), port(UART_PORT_INVALID), baudrate(_baud), data_bits(_data), stop_bits(_stop), parity(_parity)
 {
     uint32_t tickstart = lq_get_tick_ms();
@@ -67,7 +67,7 @@ ls_uarts::ls_uarts(uart_pin_t _pin, uint32_t _baud, ls_uart_data_bits_t _data, l
  * @return  发送数据长度.
  * @note    发送数据时, 会阻塞等待, 直到发送完成或超时.
  ********************************************************************************/
-ssize_t ls_uarts::uart_write(const uint8_t *_buf, ssize_t _len, uint32_t _timeout)
+ssize_t ls_uart::uart_write(const uint8_t *_buf, ssize_t _len, uint32_t _timeout)
 {
     uint32_t tickstart = lq_get_tick_ms();
     // 检查发送过程中是否有错误
@@ -109,7 +109,7 @@ ssize_t ls_uarts::uart_write(const uint8_t *_buf, ssize_t _len, uint32_t _timeou
  * @return  接收数据长度.
  * @note    接收数据时, 会阻塞等待, 直到接收完成或超时.
  ********************************************************************************/
-ssize_t ls_uarts::uart_read(uint8_t *_buf, ssize_t _len, uint32_t _timeout)
+ssize_t ls_uart::uart_read(uint8_t *_buf, ssize_t _len, uint32_t _timeout)
 {
     uint32_t tickstart = lq_get_tick_ms();
     // 检查接收过程中是否有错误
@@ -142,7 +142,7 @@ ssize_t ls_uarts::uart_read(uint8_t *_buf, ssize_t _len, uint32_t _timeout)
  * @param   none.
  * @return  串口端口号.
  ********************************************************************************/
-uart_port_t ls_uarts::get_uart_port() const
+uart_port_t ls_uart::get_uart_port() const
 {
     return this->port;
 }
@@ -152,7 +152,7 @@ uart_port_t ls_uarts::get_uart_port() const
  * @param   none.
  * @return  数据位数.
  ********************************************************************************/
-ls_uart_data_bits_t ls_uarts::get_data_bits() const
+ls_uart_data_bits_t ls_uart::get_data_bits() const
 {
     return this->data_bits;
 }
@@ -162,7 +162,7 @@ ls_uart_data_bits_t ls_uarts::get_data_bits() const
  * @param   none.
  * @return  停止位数.
  ********************************************************************************/
-ls_uart_stop_bits_t ls_uarts::get_stop_bits() const
+ls_uart_stop_bits_t ls_uart::get_stop_bits() const
 {
     return this->stop_bits;
 }
@@ -172,7 +172,7 @@ ls_uart_stop_bits_t ls_uarts::get_stop_bits() const
  * @param   none.
  * @return  校验位.
  ********************************************************************************/
-ls_uart_parity_t ls_uarts::get_parity() const
+ls_uart_parity_t ls_uart::get_parity() const
 {
     return this->parity;
 }
@@ -182,7 +182,7 @@ ls_uart_parity_t ls_uarts::get_parity() const
  * @param   none.
  * @return  波特率.
  ********************************************************************************/
-uint32_t ls_uarts::get_baudrate() const
+uint32_t ls_uart::get_baudrate() const
 {
     return this->baudrate;
 }
@@ -193,7 +193,7 @@ uint32_t ls_uarts::get_baudrate() const
  * @return  none.
  * @note    调用该函数后, 该串口实例将无法再使用.
  ********************************************************************************/
-void ls_uarts::cleanup()
+void ls_uart::cleanup()
 {
     if (this->uart_reg != nullptr) {
         LQ::ls_addr_munmap((ls_reg32_addr_t)this->uart_reg);
@@ -215,7 +215,7 @@ void ls_uarts::cleanup()
  * @return  none.
  * @note    变量生命周期结束时, 自动调用析构函数, 释放 UARTx 控制器基地址映射.
  ********************************************************************************/
-ls_uarts::~ls_uarts()
+ls_uart::~ls_uart()
 {
     this->cleanup();
 }

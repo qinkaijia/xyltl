@@ -7,8 +7,6 @@
 #include "lq_clock.hpp"
 #include "lq_common.hpp"
 
-#include "lq_uart.hpp"
-
 /****************************************************************************************************
  * @brief   宏参数定义
  ****************************************************************************************************/
@@ -137,17 +135,17 @@ typedef enum uart_pin
  * @brief   类定义
  ****************************************************************************************************/
 
-class ls_uarts : public lq_auto_cleanup
+class ls_uart : public lq_auto_cleanup
 {
 public:
 	// 构造函数
-    ls_uarts(uart_pin_t          _pin,                              /*<! 串口引脚 */
-             uint32_t            _baud   = 115200,                  /*<! 默认波特率为 115200 */
-			 ls_uart_data_bits_t _data   = LS_UART_DATA8,           /*<! 默认 8 位数据 */
-             ls_uart_stop_bits_t _stop   = LS_UART_STOP1,           /*<! 默认 1 位停止位 */
-             ls_uart_parity_t    _parity = LS_UART_PARITY_NONE);    /*<! 默认无校验位 */
+    ls_uart(uart_pin_t          _pin,                              /*<! 串口引脚 */
+            uint32_t            _baud   = 115200,                  /*<! 默认波特率为 115200 */
+			ls_uart_data_bits_t _data   = LS_UART_DATA8,           /*<! 默认 8 位数据 */
+            ls_uart_stop_bits_t _stop   = LS_UART_STOP1,           /*<! 默认 1 位停止位 */
+            ls_uart_parity_t    _parity = LS_UART_PARITY_NONE);    /*<! 默认无校验位 */
     // 析构函数
-	~ls_uarts();
+	~ls_uart();
 
 public:
 	/********************************************************************************
@@ -181,10 +179,10 @@ private:
     void cleanup() override;    // 重载 cleanup 函数
 
 public:
-    ls_uarts(const ls_uarts& other) = delete;             // 禁用复制构造函数
-    ls_uarts(ls_uarts&& other)      = delete;             // 禁用移动构造函数
-    ls_uarts& operator=(const ls_uarts& other) = delete;  // 禁用复制赋值运算符
-    ls_uarts& operator=(ls_uarts&& other)      = delete;  // 禁用移动赋值运算符
+    ls_uart(const ls_uart& other) = delete;             // 禁用复制构造函数
+    ls_uart(ls_uart&& other)      = delete;             // 禁用移动构造函数
+    ls_uart& operator=(const ls_uart& other) = delete;  // 禁用复制赋值运算符
+    ls_uart& operator=(ls_uart&& other)      = delete;  // 禁用移动赋值运算符
 
 private:
     gpio_pin_t          rx_pin;     // 接收引脚

@@ -18,7 +18,6 @@
 #include "lq_soft_spi.hpp"
 #include "lq_tcp_client.hpp"
 #include "lq_timer.hpp"
-#include "lq_uart.hpp"
 #include "lq_udp_client.hpp"
 #include "lq_ntp.hpp"
 #include "lq_signal_handle.hpp"

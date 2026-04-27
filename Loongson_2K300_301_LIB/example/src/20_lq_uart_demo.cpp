@@ -19,7 +19,7 @@
 void lq_uart_demo(void)
 {
     // 初始化串口端口, 端口引脚和波特率自定义, 其余参数采用默认值
-    ls_uarts uart(UART1_PIN42, 115200);
+    ls_uart uart(UART1_PIN42, 115200);
 
     // 定义发送数组和接收数组
     uint8_t send_buf[] = "Hello World!\n";
