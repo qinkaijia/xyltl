@@ -26,6 +26,7 @@ ls_encoder_pwm::ls_encoder_pwm(ls_enc_pwm_pin_t _pin, gpio_pin_t _dir) : dir(_di
     this->gpio = (gpio_pin_t)((_pin) & 0xFF);
     this->mux  = (gpio_mux_mode_t)((_pin>>10) & 0x03);
     this->ch   = (enc_pwm_channel_t)((_pin>>8) & 0x03);
+    // std::cout << "编码器初始化 - 引脚:" << this->gpio << " 复用:" << this->mux << " 通道:" << this->ch << std::endl;
     // 配置引脚复用
     gpio_mux_set(this->gpio, this->mux);
     // 获取 PWM 控制器基地址
@@ -39,10 +40,27 @@ ls_encoder_pwm::ls_encoder_pwm(ls_enc_pwm_pin_t _pin, gpio_pin_t _dir) : dir(_di
     this->enc_pwm_low_buf  = ls_reg_addr_calc(this->enc_pwm_base, LS_ENC_PWM_LOW_BUF_OFFSET);
     this->enc_pwm_full_buf = ls_reg_addr_calc(this->enc_pwm_base, LS_ENC_PWM_FULL_BUF_OFFSET);
     this->enc_pwm_ctrl     = ls_reg_addr_calc(this->enc_pwm_base, LS_ENC_PWM_CTRL_OFFSET);
-    // 初始化 PWM 控制器为计数模式
-    ls_writel(this->enc_pwm_ctrl, 0);
-    uint32_t reg = 0 | LS_ENC_PWM_CTRL_EN | LS_ENC_PWM_CTRL_CAPTE | LS_ENC_PWM_CTRL_INTE;
-    ls_writel(this->enc_pwm_ctrl, ls_readl(this->enc_pwm_ctrl) | reg);
+    // 清零
+    ls_writel(this->enc_pwm_ctrl, 0x00000000);
+    usleep(1000);
+    // 配置缓冲寄存器
+    ls_writel(this->enc_pwm_low_buf, 0x00000000);
+    ls_writel(this->enc_pwm_full_buf, 0x00000000);
+    // 配置控制寄存器
+    uint32_t final_config = 0;
+    final_config |= LS_ENC_PWM_CTRL_EN;     // 位0：计数器使能
+    final_config |= LS_ENC_PWM_CTRL_CAPTE;  // 位8：测量脉冲使能
+    final_config |= LS_ENC_PWM_CTRL_INTE;   // 位5：中断使能
+    ls_writel(this->enc_pwm_ctrl, final_config);
+    // 等待并验证配置
+    usleep(50000); // 等待50ms让硬件稳定
+    // uint32_t ctrl_final = ls_readl(this->enc_pwm_ctrl);
+    // std::cout << "控制寄存器最终值: 0x" << std::hex << ctrl_final << std::dec << std::endl;
+    // 每个位的配置状态
+    // std::cout << "详细位检查:" << std::endl;
+    // std::cout << "  EN位(0): " << ((ctrl_final & LS_ENC_PWM_CTRL_EN) ? "✓" : "✗") << std::endl;
+    // std::cout << "  CAPTE位(8): " << ((ctrl_final & LS_ENC_PWM_CTRL_CAPTE) ? "✓" : "✗") << std::endl;
+    // std::cout << "  INTE位(5): " << ((ctrl_final & LS_ENC_PWM_CTRL_INTE) ? "✓" : "✗") << std::endl;   
 }
 
 /********************************************************************************
