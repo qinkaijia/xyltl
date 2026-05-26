@@ -36,9 +36,18 @@
 
 int main()
 {
+    cv::Mat frame, gray;
+    lq_camera_ex cam(160, 120, 180);
+
+    // cam.set_exposure_manual(50); // 设置手动曝光
+
+    sleep(1);
+
     while (ls_system_running.load())
     {
-        usleep(100*1000);
+        // frame = cam.get_frame_raw();
+        cam.get_frame_raw_gray(frame, gray);
     }
+
     return 0;
 }
