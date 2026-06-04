@@ -11,5 +11,7 @@
 
 #include "lq_bh1750.hpp"
 #include "lq_bd_gps.hpp"
+#include "lq_dht11.hpp"
+#include "lq_tracking.hpp"
 
 #endif

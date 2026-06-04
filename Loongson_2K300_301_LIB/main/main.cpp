@@ -38,7 +38,7 @@ int main()
 {
     while (ls_system_running.load())
     {
-        usleep(100);
+        usleep(100 * 1000);
     }
 
     return 0;
