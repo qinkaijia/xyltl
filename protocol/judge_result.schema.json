@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/safetyguardian/judge_result.schema.json",
+  "title": "JudgeResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "final_risk_level",
+    "final_risk_name",
+    "agreement",
+    "final_reasons",
+    "recommended_actions",
+    "human_review_required",
+    "confidence",
+    "report_summary"
+  ],
+  "properties": {
+    "final_risk_level": { "type": "string", "enum": ["L0", "L1", "L2", "L3"] },
+    "final_risk_name": { "type": "string", "minLength": 1 },
+    "agreement": { "type": "string" },
+    "final_reasons": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "recommended_actions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "human_review_required": { "type": "boolean" },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "report_summary": { "type": "string" }
+  }
+}

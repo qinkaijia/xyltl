@@ -1,0 +1,22 @@
+# Build outputs
+build/
+cmake-build-*/
+out/
+dist/
+
+# Logs and runtime artifacts
+logs/archive/
+*.log
+*.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

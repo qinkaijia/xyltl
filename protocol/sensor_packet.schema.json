@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/safetyguardian/sensor_packet.schema.json",
+  "title": "SensorPacket",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "device_id",
+    "timestamp",
+    "temperature",
+    "humidity",
+    "tvoc",
+    "eco2",
+    "mq3_value",
+    "flame_detected"
+  ],
+  "properties": {
+    "device_id": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "temperature": { "type": "number" },
+    "humidity": { "type": "number", "minimum": 0, "maximum": 100 },
+    "tvoc": { "type": "integer", "minimum": 0 },
+    "eco2": { "type": "integer", "minimum": 0 },
+    "mq3_value": { "type": "integer", "minimum": 0 },
+    "flame_detected": { "type": "boolean" }
+  }
+}
