@@ -33,6 +33,6 @@
 - 四类协议 Schema 初稿。
 - 各模块 README 占位。
 - 自动化脚本雏形。
-- SafeCloud 最小可运行云端原型：设备、遥测、报警、命令、Dashboard 和模拟设备。
+- SafeCloud 最小可运行云端原型：设备、遥测、报警、命令、Web Dashboard 和模拟设备。
 
 后续按 `TODO.md` 逐步实现 mock 流程与真实硬件接入。

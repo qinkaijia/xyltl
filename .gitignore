@@ -3,6 +3,7 @@ build/
 cmake-build-*/
 out/
 dist/
+output/
 
 # Logs and runtime artifacts
 logs/archive/

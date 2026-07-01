@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SafeCloud 工业环境监测</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">SafeCloud</p>
+          <h1>工业智能环境监测与控制中心</h1>
+        </div>
+        <div class="toolbar">
+          <label class="api-field">
+            <span>API</span>
+            <input id="apiBaseInput" type="url" />
+          </label>
+          <button id="refreshButton" class="icon-button" type="button" title="刷新数据">↻</button>
+          <span id="connectionBadge" class="status-badge is-muted">未连接</span>
+        </div>
+      </header>
+
+      <main>
+        <section class="kpi-grid" aria-label="系统总览">
+          <article class="kpi-panel">
+            <span class="kpi-label">设备总数</span>
+            <strong id="deviceTotal">0</strong>
+            <small>已注册边缘节点</small>
+          </article>
+          <article class="kpi-panel">
+            <span class="kpi-label">在线设备</span>
+            <strong id="onlineTotal">0</strong>
+            <small id="onlineRatio">0%</small>
+          </article>
+          <article class="kpi-panel alert">
+            <span class="kpi-label">活动报警</span>
+            <strong id="activeAlarmTotal">0</strong>
+            <small>待确认与处置</small>
+          </article>
+          <article class="kpi-panel">
+            <span class="kpi-label">指标类型</span>
+            <strong id="metricTotal">0</strong>
+            <small id="metricNames">暂无指标</small>
+          </article>
+        </section>
+
+        <section class="content-grid">
+          <article class="panel telemetry-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Telemetry</p>
+                <h2>最新环境数据</h2>
+              </div>
+              <span id="lastUpdated" class="muted">等待刷新</span>
+            </div>
+            <div id="metricBoard" class="metric-board empty-state">暂无遥测数据</div>
+          </article>
+
+          <article class="panel chart-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Trend</p>
+                <h2>指标快照</h2>
+              </div>
+              <span class="muted">按最新数据归一化</span>
+            </div>
+            <canvas id="metricChart" width="720" height="260" aria-label="指标快照图"></canvas>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Alarms</p>
+                <h2>最近报警</h2>
+              </div>
+              <button id="loadAlarmsButton" class="text-button" type="button">查看全部</button>
+            </div>
+            <div id="alarmList" class="list empty-state">暂无报警</div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Devices</p>
+                <h2>设备状态</h2>
+              </div>
+              <span id="deviceStatusText" class="muted">暂无设备</span>
+            </div>
+            <div id="deviceList" class="device-list empty-state">暂无设备</div>
+          </article>
+
+          <article class="panel command-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Command</p>
+                <h2>远程控制</h2>
+              </div>
+              <span id="commandResult" class="muted">未下发</span>
+            </div>
+            <form id="commandForm" class="command-form">
+              <label>
+                <span>设备 ID</span>
+                <select id="commandDevice"></select>
+              </label>
+              <label>
+                <span>命令类型</span>
+                <select id="commandType">
+                  <option value="fan_control">fan_control</option>
+                  <option value="alarm_light">alarm_light</option>
+                  <option value="buzzer_control">buzzer_control</option>
+                  <option value="device_reset">device_reset</option>
+                </select>
+              </label>
+              <label>
+                <span>参数 JSON</span>
+                <textarea id="commandPayload" rows="4">{ "state": "on" }</textarea>
+              </label>
+              <button class="primary-button" type="submit">下发命令</button>
+            </form>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

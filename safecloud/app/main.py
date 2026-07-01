@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from app.api.routes import alarms, commands, dashboard, devices, telemetry
 from app.core.config import get_settings
@@ -7,6 +10,7 @@ from app.db.init_db import init_db
 
 
 settings = get_settings()
+WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 app = FastAPI(
     title=settings.app_name,
@@ -38,3 +42,11 @@ app.include_router(telemetry.router, prefix=settings.api_prefix)
 app.include_router(alarms.router, prefix=settings.api_prefix)
 app.include_router(commands.router, prefix=settings.api_prefix)
 app.include_router(dashboard.router, prefix=settings.api_prefix)
+
+if WEB_DIR.exists():
+    app.mount("/static", StaticFiles(directory=WEB_DIR), name="safecloud-web")
+
+
+@app.get("/dashboard", tags=["web"])
+def dashboard_page():
+    return FileResponse(WEB_DIR / "index.html")
