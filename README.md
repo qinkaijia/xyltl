@@ -36,5 +36,6 @@
 - 自动化脚本雏形。
 - SafeCloud 最小可运行云端原型：设备、遥测、报警、命令、Web Dashboard 和模拟设备。
 - 命令行版语音 + LLM demo：VAD 录音、手动 ASR、MockLLM、安全校验、模拟设备命令执行。
+- 语音 demo ASR 后端：manual、百度短语音识别、讯飞语音听写。
 
 后续按 `TODO.md` 逐步实现 mock 流程与真实硬件接入。

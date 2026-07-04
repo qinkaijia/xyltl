@@ -1,8 +1,16 @@
 # 智能语音 + LLM 命令行 Demo
 
-这是一个不依赖 Qt 的命令行版语音交互核心模块，用于在龙芯 2K1000LA 或 Linux 环境中先跑通“录音 -> 手动 ASR -> MockLLM 意图识别 -> 安全校验 -> 模拟设备命令执行 -> 日志记录”的闭环。
+这是一个不依赖 Qt 的命令行版语音交互核心模块，用于在龙芯 2K1000LA 或 Linux 环境中跑通：
 
-当前版本默认不接真实 ASR、不接真实 LLM、不接真实传感器。后续可以把 `ASRClient`、`LLMClient`、`DeviceState` 和 `CommandDispatcher` 替换为真实实现。
+```text
+VAD 自动录音 -> ASRClient 识别文本 -> MockLLM 意图识别 -> SafetyGuard 安全校验 -> 模拟设备命令执行 -> 日志记录
+```
+
+当前支持三种 ASR 模式：
+
+- `manual`：手动输入模拟 ASR 文本，调试兜底。
+- `baidu`：百度短语音识别 REST API。
+- `xfyun`：讯飞语音听写 WebSocket API。
 
 ## 目录结构
 
@@ -10,6 +18,7 @@
 voice_llm_demo/
   main.py
   config.py
+  requirements.txt
   recorder/
     vad_recorder.py
   asr/
@@ -24,20 +33,28 @@ voice_llm_demo/
     safety_guard.py
   data/recorded/
   logs/
-  README.md
 ```
+
+## 安装依赖
+
+录音依赖系统命令 `arecord`。云端 ASR 推荐安装 Python 包：
+
+```bash
+cd ~/voice_llm_demo
+pip3 install -r requirements.txt
+```
+
+说明：
+
+- 百度 ASR 优先使用 `requests`，如果系统没有安装 `requests`，会自动降级使用 Python 标准库 `urllib`。
+- 讯飞 ASR 使用 WebSocket，必须安装 `websocket-client`。
+
+如果板子 apt 或 pip 下载失败，不要先改网络配置，先记录错误信息；开发板厂商源或外部服务器异常很常见。
 
 ## 运行方法
 
 ```bash
 cd ~/voice_llm_demo
-python3 main.py
-```
-
-如果是在本仓库中运行：
-
-```bash
-cd voice_llm_demo
 python3 main.py
 ```
 
@@ -48,7 +65,34 @@ python3 main.py
 按 Enter 开始一次语音交互，输入 q 退出
 ```
 
-按 Enter 后程序会监听麦克风并自动录音。录音完成后，当前版本会提示手动输入模拟 ASR 文本。
+按 Enter 后程序会监听麦克风并自动录音，随后调用 `ASRClient.transcribe(audio_path)`。ASR 返回文本后，主流程继续交给 LLM、SafetyGuard 和 CommandDispatcher。
+
+## 切换 ASR 模式
+
+在 `config.py` 中修改：
+
+```python
+ASR_MODE = "manual"
+ASR_MODE = "baidu"
+ASR_MODE = "xfyun"
+```
+
+`main.py` 不需要修改。
+
+## manual 模式
+
+默认配置：
+
+```python
+ASR_MODE = "manual"
+```
+
+录音完成后会提示：
+
+```text
+录音已保存：data/recorded/input_xxx.wav
+请手动输入模拟 ASR 识别文本：
+```
 
 可测试文本：
 
@@ -61,11 +105,66 @@ python3 main.py
 停止检测
 ```
 
-## 依赖说明
+## 百度 ASR 模式
 
-代码尽量只使用 Python 标准库。录音依赖 Linux 的 ALSA 命令行工具 `arecord`。
+1. 在 `config.py` 中设置：
 
-常用检查命令：
+```python
+ASR_MODE = "baidu"
+```
+
+2. 配置环境变量：
+
+```bash
+export BAIDU_API_KEY="你的百度API_KEY"
+export BAIDU_SECRET_KEY="你的百度SECRET_KEY"
+```
+
+3. 运行：
+
+```bash
+python3 main.py
+```
+
+百度模式会先获取 OAuth `access_token`，再调用短语音识别接口。当前录音格式为：
+
+```text
+wav / 16000 Hz / 16 bit / 单声道
+```
+
+如果密钥缺失、网络失败或百度返回错误码，程序不会崩溃，会打印中文错误并回退到 manual 输入。
+
+## 讯飞 ASR 模式
+
+1. 在 `config.py` 中设置：
+
+```python
+ASR_MODE = "xfyun"
+```
+
+2. 配置环境变量：
+
+```bash
+export XFYUN_APP_ID="你的讯飞APPID"
+export XFYUN_API_KEY="你的讯飞API_KEY"
+export XFYUN_API_SECRET="你的讯飞API_SECRET"
+```
+
+3. 运行：
+
+```bash
+python3 main.py
+```
+
+讯飞模式会读取 wav 文件中的 PCM 数据，通过 WebSocket 按帧发送：
+
+- 首帧：`status = 0`
+- 中间帧：`status = 1`
+- 尾帧：`status = 2`
+
+如果密钥缺失、网络失败、WebSocket 连接失败或讯飞返回错误码，程序不会崩溃，会打印中文错误并回退到 manual 输入。
+
+## 麦克风测试命令
 
 ```bash
 arecord -l
@@ -74,18 +173,9 @@ aplay test.wav
 python3 main.py
 ```
 
-## 麦克风测试方法
-
-1. 运行 `arecord -l` 查看录音设备。
-2. 运行 `arecord -q -f S16_LE -r 16000 -c 1 -d 4 test.wav` 录 4 秒。
-3. 运行 `aplay test.wav` 回放。
-4. 如果能听到声音，再运行 `python3 main.py`。
-
-## 常见问题
+## 常见错误排查
 
 ### 未找到 arecord
-
-说明系统可能没有安装 ALSA 工具。可先检查：
 
 ```bash
 which arecord
@@ -96,43 +186,57 @@ arecord -l
 
 ### arecord 找不到声卡
 
-检查 USB 声卡或麦克风是否插好：
-
 ```bash
 lsusb
 cat /proc/asound/cards
 arecord -l
+alsamixer
 ```
 
-也可以用 `alsamixer` 检查输入音量是否被静音。
+确认麦克风或 USB 声卡已插好，输入通道没有静音。
 
 ### 录音一直不停止
 
-可能环境噪声过大，或麦克风增益太高。可以在 `config.py` 中调整：
+可能环境噪声过大，或麦克风增益太高。可在 `config.py` 中调整：
 
 - `THRESHOLD_RATIO`
 - `MIN_ABSOLUTE_THRESHOLD`
 - `END_SILENCE_SECONDS`
 - `MAX_RECORD_SECONDS`
 
-### 录音太短
+### 百度 ASR 报错
 
-可以适当降低 `MIN_ABSOLUTE_THRESHOLD` 或提高麦克风增益。
+检查：
 
-## 接入真实 ASR
-
-当前 `config.py` 中：
-
-```python
-USE_REAL_ASR = False
-ASR_API_URL = "http://127.0.0.1:8000/api/asr"
+```bash
+echo "$BAIDU_API_KEY"
+echo "$BAIDU_SECRET_KEY"
+ping aip.baidubce.com
 ```
 
-后续接入真实 ASR 时：
+常见原因：
 
-1. 将 `USE_REAL_ASR` 改为 `True`。
-2. 在 `asr/asr_client.py` 中把 `_transcribe_http()` 对接真实接口协议。
-3. 保持 `transcribe(audio_path) -> str` 接口不变，主程序无需修改。
+- API Key 或 Secret Key 配错。
+- 应用未开通语音识别能力。
+- 网络无法访问百度云接口。
+- 音频格式不是 16k/16bit/单声道 wav。
+
+### 讯飞 ASR 报错
+
+检查：
+
+```bash
+echo "$XFYUN_APP_ID"
+echo "$XFYUN_API_KEY"
+echo "$XFYUN_API_SECRET"
+```
+
+常见原因：
+
+- APPID、APIKey、APISecret 不匹配。
+- 系统时间不准，导致鉴权失败。
+- WebSocket 连接被网络环境拦截。
+- 音频格式不是 16k/16bit/单声道 PCM/wav。
 
 ## 接入真实 LLM
 
@@ -140,7 +244,7 @@ ASR_API_URL = "http://127.0.0.1:8000/api/asr"
 
 1. 将 `USE_REAL_LLM` 改为 `True`。
 2. 在 `llm/llm_client.py` 中把 `_analyze_http()` 对接真实 LLM 服务。
-3. 确保真实 LLM 返回字段包含：
+3. 保持返回结构不变：
 
 ```python
 {
@@ -154,4 +258,3 @@ ASR_API_URL = "http://127.0.0.1:8000/api/asr"
 ```
 
 无论是真实 LLM 还是 MockLLM，输出都会经过 `SafetyGuard` 独立校验。
-
