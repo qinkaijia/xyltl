@@ -1,5 +1,30 @@
 """Command-line voice interaction demo configuration."""
 
+import os
+
+
+def _load_local_env() -> None:
+    """Load optional KEY=VALUE pairs from .env without adding extra dependencies."""
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if not os.path.exists(env_path):
+        return
+    try:
+        with open(env_path, "r", encoding="utf-8") as env_file:
+            for raw_line in env_file:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except OSError as exc:
+        print("读取 .env 失败：{}".format(exc))
+
+
+_load_local_env()
+
 SAMPLE_RATE = 16000
 CHANNELS = 1
 SAMPLE_WIDTH = 2
@@ -16,7 +41,7 @@ MIN_ABSOLUTE_THRESHOLD = 300
 USE_REAL_LLM = False
 
 # ASR mode: manual / baidu / xfyun
-ASR_MODE = "manual"
+ASR_MODE = os.environ.get("ASR_MODE", "manual")
 
 # Baidu short speech recognition
 BAIDU_API_KEY_ENV = "BAIDU_API_KEY"

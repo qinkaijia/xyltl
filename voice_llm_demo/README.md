@@ -79,6 +79,19 @@ ASR_MODE = "xfyun"
 
 `main.py` 不需要修改。
 
+也可以在项目目录创建不会提交到 Git 的 `.env` 文件：
+
+```bash
+ASR_MODE=baidu
+BAIDU_API_KEY=你的百度API_KEY
+BAIDU_SECRET_KEY=你的百度SECRET_KEY
+XFYUN_APP_ID=你的讯飞APPID
+XFYUN_API_KEY=你的讯飞API_KEY
+XFYUN_API_SECRET=你的讯飞API_SECRET
+```
+
+程序启动时会自动读取 `~/voice_llm_demo/.env`。请不要把真实密钥提交到代码仓库。
+
 ## manual 模式
 
 默认配置：
