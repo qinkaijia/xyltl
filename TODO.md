@@ -14,6 +14,7 @@
 
 - 项目框架已建立。
 - SafeCloud 云端最小可运行原型和 Web Dashboard 已建立。
+- 命令行版语音 + LLM demo 已建立。
 - 嵌入式、HMI、视觉、语音等业务模块尚未实现。
 
 ## 下一步建议
@@ -21,4 +22,5 @@
 1. 运行 SafeCloud、Web Dashboard 和 `simulator/mock_device.py` 做云端闭环联调。
 2. 增加场景化 mock 数据，覆盖正常、温湿度异常、气体异常等测试场景。
 3. 为 Web Dashboard 增加历史曲线和报警处理按钮。
-4. 再开始真实龙芯硬件接入。
+4. 在龙芯板上运行 `voice_llm_demo`，验证 `arecord`、麦克风和手动 ASR 流程。
+5. 再开始真实龙芯硬件接入。

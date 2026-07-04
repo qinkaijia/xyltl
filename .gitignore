@@ -12,6 +12,8 @@ logs/archive/
 *.db
 *.sqlite
 *.sqlite3
+voice_llm_demo/data/recorded/*.wav
+voice_llm_demo/logs/*.log
 
 # Python
 __pycache__/
