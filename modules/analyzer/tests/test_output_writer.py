@@ -31,4 +31,3 @@ def test_output_writer_writes_json(tmp_path):
     loaded = json.loads(output_path.read_text(encoding="utf-8"))
     assert loaded["alarm_level"] == 1
     assert loaded["status_text"] == "预警"
-

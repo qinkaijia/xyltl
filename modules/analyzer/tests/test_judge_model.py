@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from models import LLMAnalysisResult, RuleResult, SensorData, SystemState, now_text
 from judge_model import JudgeModel
+from models import LLMAnalysisResult, RuleResult, SensorData, SystemState, now_text
 
 
 def test_judge_model_fuses_multiple_results():
@@ -14,4 +14,3 @@ def test_judge_model_fuses_multiple_results():
     judge = JudgeModel().judge(sensor, SystemState(), rule, model_results)
     assert judge.alarm_level == 2
     assert judge.suggestion
-

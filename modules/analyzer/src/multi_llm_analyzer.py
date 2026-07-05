@@ -7,7 +7,7 @@ from models import LLMAnalysisResult, RuleResult, SensorData, SystemState
 
 
 class MultiLLMAnalyzer:
-    """Call routed LLM clients in order. Current real clients fall back to mock."""
+    """Call routed LLM clients in order. Real clients fall back to mock."""
 
     def __init__(self, llm_config: Dict) -> None:
         self.llm_config = llm_config
@@ -40,7 +40,7 @@ class MultiLLMAnalyzer:
             try:
                 result = client.analyze(payload, role)
                 results.append(LLMAnalysisResult.from_dict(result))
-            except Exception as exc:  # keep whole analysis stable
+            except Exception as exc:
                 results.append(
                     LLMAnalysisResult(
                         model_name=model_name,

@@ -26,7 +26,7 @@ class MockLLMClient(BaseLLMClient):
     @staticmethod
     def _summary(level: int) -> str:
         if level == 2:
-            return "存在明确报警风险，需保持本地安全联动。"
+            return "存在明确报警风险，需要保持本地安全联动。"
         if level == 1:
             return "存在预警风险，建议现场巡检并观察趋势。"
         return "未发现明显风险。"

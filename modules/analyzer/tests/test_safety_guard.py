@@ -20,4 +20,3 @@ def test_safety_guard_fills_voice_and_suggestion():
     final = SafetyGuard().enforce(judge, rule, sensor, SystemState())
     assert final.suggestion
     assert final.voice_text
-

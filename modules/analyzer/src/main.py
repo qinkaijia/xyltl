@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -34,7 +35,7 @@ DEFAULT_INPUT = {
 }
 
 
-def run_demo(input_data: dict) -> dict:
+def run_demo(input_data: dict, force_model: str = "") -> dict:
     thresholds_path = MODULE_DIR / "config" / "thresholds.json"
     llm_config_path = MODULE_DIR / "config" / "llm_config.yaml"
     output_path = MODULE_DIR / "runtime" / "system_status.json"
@@ -51,6 +52,7 @@ def run_demo(input_data: dict) -> dict:
         task_type=task_type,
         rule_result=rule_result,
         network_state=system_state.cloud_connected,
+        force_model=force_model,
     )
 
     model_results = MultiLLMAnalyzer(llm_config).analyze(
@@ -60,12 +62,14 @@ def run_demo(input_data: dict) -> dict:
         selected_models=router_decision.selected_models,
     )
     judge_result = JudgeModel().judge(sensor_data, system_state, rule_result, model_results)
+    analysis_mode = _analysis_mode(router_decision.selected_models, model_results)
     final_status = SafetyGuard().enforce(
         judge_result=judge_result,
         rule_result=rule_result,
         sensor_data=sensor_data,
         system_state=system_state,
         llm_available=bool(router_decision.selected_models),
+        analysis_mode=analysis_mode,
     )
     OutputWriter(output_path).write(final_status)
 
@@ -80,10 +84,28 @@ def run_demo(input_data: dict) -> dict:
     return result
 
 
+def _analysis_mode(selected_models: list[str], model_results: list) -> str:
+    if not selected_models:
+        return "rule_fallback"
+    has_real_success = any(
+        item.error is None and item.model_name not in ("mock", "rule_fallback") and not item.model_name.endswith("_mock")
+        for item in model_results
+    )
+    return "real_multi_llm" if has_real_success else "mock_multi_llm"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Analyzer module demo")
     parser.add_argument("--input-json", help="Inline JSON input for sensor/system state.")
     parser.add_argument("--input-file", help="Path to JSON input file.")
+    parser.add_argument("--use-real-llm", action="store_true", help="Enable real cloud LLM API calls.")
+    parser.add_argument(
+        "--force-model",
+        choices=["deepseek", "kimi", "zhipu", "doubao", "qwen", "mock"],
+        default="",
+        help="Force one model for step-by-step API debugging.",
+    )
+    parser.add_argument("--print-debug", action="store_true", help="Print router and model debug details.")
     return parser.parse_args()
 
 
@@ -98,9 +120,12 @@ def load_input(args: argparse.Namespace) -> dict:
 
 def main() -> None:
     args = parse_args()
-    result = run_demo(load_input(args))
-    clean_result = {key: value for key, value in result.items() if key != "_debug"}
-    print(json.dumps(clean_result, ensure_ascii=False, indent=2))
+    if args.use_real_llm:
+        os.environ["ANALYZER_USE_REAL_LLM"] = "true"
+
+    result = run_demo(load_input(args), force_model=args.force_model)
+    output = result if args.print_debug else {key: value for key, value in result.items() if key != "_debug"}
+    print(json.dumps(output, ensure_ascii=False, indent=2))
     print("分析完成，结果已写入 modules/analyzer/runtime/system_status.json")
 
 

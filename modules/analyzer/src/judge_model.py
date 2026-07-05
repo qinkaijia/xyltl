@@ -74,8 +74,7 @@ class JudgeModel:
         if model_results:
             summaries = [result.risk_summary for result in model_results if result.risk_summary]
             if summaries:
-                common = Counter(summaries).most_common(1)[0][0]
-                return common
+                return Counter(summaries).most_common(1)[0][0]
         if final_level == 0:
             return "本地规则和模型分析均未发现明显风险。"
         return rule_result.reason

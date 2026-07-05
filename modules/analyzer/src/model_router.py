@@ -81,7 +81,11 @@ class ModelRouter:
         task_type: str,
         rule_result: RuleResult,
         network_state: bool = True,
+        force_model: str = "",
     ) -> RouterDecision:
+        if force_model:
+            return RouterDecision([force_model], self._judge_model(), f"调试模式强制选择模型 {force_model}")
+
         router_config = self.config["router"].get(task_type, self.config["router"]["normal"])
         if not router_config.get("call_llm", False):
             return RouterDecision([], self._judge_model(), "当前为正常状态，无需调用大模型。")
