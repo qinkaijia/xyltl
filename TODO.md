@@ -15,6 +15,7 @@
 - 项目框架已建立。
 - SafeCloud 云端最小可运行原型和 Web Dashboard 已建立。
 - 命令行版语音 + LLM demo 已建立。
+- Analyzer 大模型调用与多模型协同分析模块已建立。
 - 嵌入式、HMI、视觉、语音等业务模块尚未实现。
 
 ## 下一步建议
@@ -25,4 +26,5 @@
 4. 在龙芯板上运行 `voice_llm_demo`，验证 `arecord`、麦克风和手动 ASR 流程。
 5. 为龙芯板补齐 Python 包安装方式，确保 `websocket-client` 可用于讯飞 ASR。
 6. 配置百度或讯飞真实密钥，做云端 ASR 联调。
-7. 再开始真实龙芯硬件接入。
+7. 将 Analyzer 输出 `modules/analyzer/runtime/system_status.json` 接入 Qt、语音和云端模块。
+8. 再开始真实龙芯硬件接入。

@@ -4,6 +4,7 @@ cmake-build-*/
 out/
 dist/
 output/
+tools/loongson-gnu-toolchain-*/
 
 # Logs and runtime artifacts
 logs/archive/

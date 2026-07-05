@@ -1,0 +1,24 @@
+{
+  "temperature": {
+    "warning": 60.0,
+    "alarm": 75.0
+  },
+  "humidity": {
+    "warning_low": 20.0,
+    "warning_high": 80.0,
+    "alarm_low": 10.0,
+    "alarm_high": 90.0
+  },
+  "gas": {
+    "warning": 0.3,
+    "alarm": 0.6
+  },
+  "vibration": {
+    "warning": 1.5,
+    "alarm": 2.5
+  },
+  "current": {
+    "warning": 3.0,
+    "alarm": 5.0
+  }
+}

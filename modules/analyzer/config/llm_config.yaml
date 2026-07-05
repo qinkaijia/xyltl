@@ -1,0 +1,96 @@
+models:
+  deepseek:
+    enabled: true
+    role: engineering_diagnosis
+    priority: 90
+    cost_level: medium
+    latency_level: medium
+    support_json: true
+
+  kimi:
+    enabled: true
+    role: long_context_report
+    priority: 80
+    cost_level: medium
+    latency_level: medium
+    support_json: true
+
+  zhipu:
+    enabled: true
+    role: judge_or_general
+    priority: 85
+    cost_level: medium
+    latency_level: medium
+    support_json: true
+
+  doubao:
+    enabled: true
+    role: fast_voice_response
+    priority: 75
+    cost_level: low
+    latency_level: low
+    support_json: true
+
+  qwen:
+    enabled: true
+    role: stable_structured_output
+    priority: 88
+    cost_level: medium
+    latency_level: medium
+    support_json: true
+
+  mock:
+    enabled: true
+    role: demo
+    priority: 100
+    cost_level: low
+    latency_level: low
+    support_json: true
+
+router:
+  normal:
+    call_llm: false
+    max_models: 0
+    preferred_models: []
+
+  warning:
+    call_llm: true
+    max_models: 1
+    preferred_models:
+      - doubao
+      - qwen
+      - zhipu
+      - mock
+
+  alarm:
+    call_llm: true
+    max_models: 3
+    preferred_models:
+      - deepseek
+      - zhipu
+      - qwen
+      - kimi
+      - mock
+
+  voice_question:
+    call_llm: true
+    max_models: 1
+    preferred_models:
+      - doubao
+      - qwen
+      - mock
+
+  cloud_report:
+    call_llm: true
+    max_models: 1
+    preferred_models:
+      - kimi
+      - qwen
+      - mock
+
+judge:
+  preferred_models:
+    - zhipu
+    - qwen
+    - deepseek
+    - mock

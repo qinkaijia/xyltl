@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-07-05 16:52:32",
+  "device_id": "device_001",
+  "alarm_level": 1,
+  "status_text": "预警",
+  "temperature": 72.5,
+  "humidity": 61.0,
+  "gas": 0.25,
+  "vibration": 1.82,
+  "current": 2.3,
+  "reason": "存在预警风险，建议现场巡检并观察趋势。",
+  "suggestion": "请检查现场状态，重点关注异常指标。",
+  "voice_text": "当前设备处于预警状态。存在预警风险，建议现场巡检并观察趋势。请检查现场状态，重点关注异常指标。",
+  "cloud_connected": true,
+  "need_cloud_upload": true,
+  "need_voice_alert": true,
+  "analysis_mode": "mock_multi_llm",
+  "source": {
+    "rule_engine": true,
+    "llm_analyzer": true,
+    "judge_model": true,
+    "safety_guard": true
+  }
+}

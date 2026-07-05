@@ -19,6 +19,7 @@
 - `voice/`：语音唤醒、识别和播报。
 - `voice_llm_demo/`：命令行版语音 + LLM 交互核心模块。
 - `safecloud/`：云端 SafeCloud 服务与多 LLM 仲裁。
+- `modules/analyzer/`：大模型调用与多模型协同分析模块。
 - `protocol/`：统一通信协议 JSON Schema。
 - `scripts/`：环境检查、构建、部署、运行和日志脚本。
 - `tests/`：系统级 mock 数据、集成测试和场景测试。
@@ -37,5 +38,6 @@
 - SafeCloud 最小可运行云端原型：设备、遥测、报警、命令、Web Dashboard 和模拟设备。
 - 命令行版语音 + LLM demo：VAD 录音、手动 ASR、MockLLM、安全校验、模拟设备命令执行。
 - 语音 demo ASR 后端：manual、百度短语音识别、讯飞语音听写。
+- Analyzer 最小可运行版本：RuleEngine、TaskClassifier、ModelRouter、Mock 多模型分析、JudgeModel、SafetyGuard、JSON 输出。
 
 后续按 `TODO.md` 逐步实现 mock 流程与真实硬件接入。
