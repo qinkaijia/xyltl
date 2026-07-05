@@ -83,6 +83,17 @@ QWEN_API_KEY / QWEN_API_URL / QWEN_MODEL
 - HTTP、网络、JSON 解析失败时，该 provider 自动回退 mock，并在 `_debug.model_results[].error` 中记录原因。
 - SafetyGuard 会保证云端模型不能降低本地规则判定出的报警等级。
 
+## 龙芯板端联调记录
+
+已在龙芯 2K1000LA 开发板上完成 analyzer 真实 API 调用验证：
+
+- 板端路径：`/home/xylt/xylt/modules/analyzer`
+- Python：3.7.3
+- Mock 主流程：通过
+- DeepSeek、Kimi、智谱、豆包、通义单模型真实调用：通过
+- 报警场景自动路由 `deepseek + zhipu + qwen` 多模型仲裁：通过
+- 最终报警等级保持 `alarm_level=2`，`need_voice_alert=true`，`need_cloud_upload=true`
+
 ## 测试
 
 ```bash

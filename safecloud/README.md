@@ -1,135 +1,131 @@
 # SafeCloud 云端原型
 
-SafeCloud 是本项目的云端系统原型，负责设备管理、遥测接收、历史数据存储、阈值报警、控制指令下发和 Dashboard 数据聚合。
+SafeCloud 是本项目的云端服务原型，负责设备管理、遥测接收、历史数据存储、阈值报警、控制命令下发、Dashboard 数据聚合，以及通过 analyzer 进行多 LLM 安全分析。
 
-当前版本不依赖真实硬件，真实龙芯派或边缘网关后续只需要按 HTTP API 或预留 MQTT Topic 接入标准 JSON 数据。
+当前云端服务不直接接 GPIO、I2C、SPI 或传感器驱动，只接收端侧标准化后的 JSON。
 
 ## 功能
 
 - 设备新增、查询和状态更新。
-- 动态 `metrics` 遥测数据上传，不写死传感器字段。
+- 动态 `metrics` 遥测数据上传。
 - SQLite 存储设备、遥测、报警和命令。
-- 简单阈值报警，阈值可通过环境变量配置。
-- 云端创建控制指令，设备轮询待执行指令并回传结果。
-- Dashboard Summary 接口，便于后续 Web 大屏展示。
-- 模拟设备脚本，可定时上传数据并执行命令。
+- 简单阈值报警。
+- 控制命令创建、设备轮询和执行结果回传。
+- Dashboard Summary 接口和静态 Web 大屏。
+- `POST /api/evaluate`：调用 `modules/analyzer`，返回统一安全状态。
 
-## 目录
+## 启动
 
-```text
-safecloud/
-  app/
-    main.py
-    core/config.py
-    db/
-    models/
-    schemas/
-    services/
-    api/routes/
-  simulator/mock_device.py
-  docs/
-  requirements.txt
-  .env.example
-```
-
-## 启动方式
-
-Linux / macOS:
+安装依赖：
 
 ```bash
 cd safecloud
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m app.db.init_db
-uvicorn app.main:app --reload
+python -m pip install -r requirements.txt
 ```
 
-Windows PowerShell:
+本机调试：
 
-```powershell
-cd safecloud
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m app.db.init_db
-uvicorn app.main:app --reload
+```bash
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+给龙芯板访问时需要监听局域网地址：
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+或使用脚本：
+
+```bash
+SAFECLOUD_HOST=0.0.0.0 SAFECLOUD_PORT=8000 ../scripts/run/run_safecloud.sh
 ```
 
 启动后访问：
 
-- 健康检查：http://127.0.0.1:8000/health
-- Swagger API：http://127.0.0.1:8000/docs
-- Web 大屏：http://127.0.0.1:8000/dashboard
+- 健康检查：`http://127.0.0.1:8000/health`
+- Swagger API：`http://127.0.0.1:8000/docs`
+- Web 大屏：`http://127.0.0.1:8000/dashboard`
 
-## 快速测试
+## Analyzer 评估接口
 
-创建设备：
+Mock 模式：
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/devices \
+curl -X POST http://127.0.0.1:8000/api/evaluate \
   -H "Content-Type: application/json" \
-  -d '{"device_id":"gateway_001","device_name":"一号边缘网关","device_type":"gateway","location":"实验室演示舱","status":"online"}'
+  -d '{
+    "device_id": "device_001",
+    "metrics": {
+      "temperature": 72.5,
+      "humidity": 61.0,
+      "gas": 0.25,
+      "vibration": 1.82,
+      "current": 2.3
+    },
+    "include_debug": true
+  }'
 ```
 
-上传遥测：
+真实 LLM 单模型调试：
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/telemetry \
+curl -X POST http://127.0.0.1:8000/api/evaluate \
   -H "Content-Type: application/json" \
-  -d '{"device_id":"gateway_001","timestamp":"2026-07-01T12:00:00Z","metrics":{"temperature":48.5,"humidity":58.2,"gas":360,"light":300}}'
+  -d '{
+    "device_id": "device_001",
+    "metrics": {
+      "temperature": 72.5,
+      "humidity": 61.0,
+      "gas": 0.25,
+      "vibration": 1.82,
+      "current": 2.3
+    },
+    "use_real_llm": true,
+    "force_model": "deepseek",
+    "include_debug": true
+  }'
 ```
 
-查询最新数据：
+如果开启真实 LLM，需要在运行 SafeCloud 的进程环境中配置 analyzer 所需 API Key，或提供 `modules/analyzer/.env`。真实密钥不要提交到 git。
+
+## 板端调用方式
+
+假设 Windows/云端主机局域网 IP 为 `192.168.14.20`：
 
 ```bash
-curl http://127.0.0.1:8000/api/telemetry/latest/gateway_001
+python3 - <<'PY'
+import json
+import urllib.request
+
+payload = {
+    "device_id": "board_2k1000la",
+    "metrics": {
+        "temperature": 86.0,
+        "humidity": 60.0,
+        "gas": 0.32,
+        "vibration": 2.8,
+        "current": 4.2,
+    },
+    "use_real_llm": False,
+    "include_debug": True,
+}
+req = urllib.request.Request(
+    "http://192.168.14.20:8000/api/evaluate",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={"Content-Type": "application/json"},
+    method="POST",
+)
+print(urllib.request.urlopen(req, timeout=60).read().decode("utf-8"))
+PY
 ```
 
-创建控制指令：
+## 测试
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/commands \
-  -H "Content-Type: application/json" \
-  -d '{"device_id":"gateway_001","command_type":"fan_control","command_payload":{"state":"on"}}'
+PYTHONPATH=safecloud python -m pytest safecloud/tests
+python -m pytest modules/analyzer/tests
 ```
-
-查询 Dashboard：
-
-```bash
-curl http://127.0.0.1:8000/api/dashboard/summary
-```
-
-## 模拟设备
-
-在另一个终端运行：
-
-```bash
-cd safecloud
-python simulator/mock_device.py --base-url http://127.0.0.1:8000 --device-id gateway_001 --interval 5
-```
-
-模拟设备会：
-
-- 自动创建或复用设备。
-- 定时生成动态环境指标并上传。
-- 查询待执行控制命令。
-- 模拟执行命令并回传执行结果。
-
-## Web 大屏
-
-前端位于 `web/`，由 FastAPI 挂载为静态资源。启动后端后，访问 `/dashboard` 即可打开。
-
-大屏当前包含：
-
-- 系统 KPI：设备总数、在线设备、活动报警、指标类型。
-- 最新环境数据卡片。
-- 指标快照图。
-- 最近报警列表。
-- 设备状态列表。
-- 远程控制命令表单。
-
-页面默认使用当前后端同源 API；如果前端和后端分开部署，可在右上角 API 输入框切换地址。
 
 ## 文档
 

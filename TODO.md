@@ -1,30 +1,26 @@
 # TODO
 
-## 第一阶段
+## 已完成
 
-1. 创建仓库目录结构。
-2. 写入 `AGENTS.md` 与 `PROJECT_CONTEXT.md`。
-3. 写入 `protocol/` 下的 JSON Schema 初稿。
-4. 编写 M1 传感器采集模块 mock 版本。
-5. 编写 M2 执行控制模块 mock 版本。
-6. 编写一键 build/deploy/run 脚本雏形。
-7. 连接真实硬件并逐步替换 mock 数据。
+- 建立仓库目录结构、AGENTS.md、PROJECT_CONTEXT.md 和协议 Schema 初稿。
+- 建立 SafeCloud 云端最小原型和 Web Dashboard。
+- 建立命令行语音 + LLM demo。
+- 为语音 demo 增加 manual / 百度 / 讯飞 ASR 可切换后端。
+- 建立 Analyzer 大模型调用与多模型协同分析模块。
+- 在龙芯 2K1000LA 板端验证 Analyzer 真实 API 调用。
+- 为 SafeCloud 增加 `/api/evaluate`，接入 Analyzer。
 
-## 当前完成
+## 当前联调任务
 
-- 项目框架已建立。
-- SafeCloud 云端最小可运行原型和 Web Dashboard 已建立。
-- 命令行版语音 + LLM demo 已建立。
-- Analyzer 大模型调用与多模型协同分析模块已建立。
-- 嵌入式、HMI、视觉、语音等业务模块尚未实现。
+1. 启动 Windows/云端 SafeCloud：`SAFECLOUD_HOST=0.0.0.0`。
+2. 从龙芯板通过 HTTP 调用 `/api/evaluate`，发送模拟传感器 JSON。
+3. 验证 mock 模式、单模型真实模式、多模型报警仲裁模式。
+4. 记录板端到云端调用延迟和失败回退表现。
 
 ## 下一步建议
 
-1. 运行 SafeCloud、Web Dashboard 和 `simulator/mock_device.py` 做云端闭环联调。
-2. 增加场景化 mock 数据，覆盖正常、温湿度异常、气体异常等测试场景。
-3. 为 Web Dashboard 增加历史曲线和报警处理按钮。
-4. 在龙芯板上运行 `voice_llm_demo`，验证 `arecord`、麦克风和手动 ASR 流程。
-5. 为龙芯板补齐 Python 包安装方式，确保 `websocket-client` 可用于讯飞 ASR。
-6. 配置百度或讯飞真实密钥，做云端 ASR 联调。
-7. 将 Analyzer 输出 `modules/analyzer/runtime/system_status.json` 接入 Qt、语音和云端模块。
-8. 再开始真实龙芯硬件接入。
+1. 将 `/api/evaluate` 返回的 `final_status` 接入 Qt HMI。
+2. 将 `voice_text` 接入语音播报。
+3. 增加场景化 mock 数据：正常、温度异常、气体异常、振动异常、传感器离线。
+4. 为 2K1000LA 侧增加 HTTP 客户端模块，封装云端请求和超时回退。
+5. 后续再接真实 2K0301 传感器采集与执行控制。
