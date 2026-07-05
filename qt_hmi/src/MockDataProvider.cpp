@@ -1,16 +1,25 @@
 #include "MockDataProvider.h"
 
-#include <QTimer>
 #include <QRandomGenerator>
+#include <QTimer>
 #include <algorithm>
 
-// 刷新间隔：1 秒
 static const int kRefreshIntervalMs = 1000;
 
-// 把数值限制在 [lo, hi] 区间内
-static double clampd(double v, double lo, double hi)
+static double clampd(double value, double low, double high)
 {
-    return std::max(lo, std::min(hi, v));
+    return std::max(low, std::min(high, value));
+}
+
+static int levelFromHighThreshold(double value, double warning, double alarm)
+{
+    if (value >= alarm) {
+        return LEVEL_ALARM;
+    }
+    if (value >= warning) {
+        return LEVEL_WARNING;
+    }
+    return LEVEL_NORMAL;
 }
 
 MockDataProvider::MockDataProvider(QObject *parent)
@@ -28,7 +37,6 @@ void MockDataProvider::start()
     if (!m_timer->isActive()) {
         m_timer->start();
     }
-    // 启动时立即产生一份数据，避免界面停留在初始空值
     generate();
 }
 
@@ -41,56 +49,55 @@ void MockDataProvider::generate()
 {
     QRandomGenerator *rng = QRandomGenerator::global();
 
-    SystemStatus s;
-
-    // ---- 温度：在上次基础上小幅波动，范围约束在 15~45 ℃ ----
-    m_temperature += (rng->bounded(100) - 50) / 50.0;   // 约 ±1.0 ℃ 抖动
+    m_temperature += (rng->bounded(100) - 50) / 50.0;
     m_temperature = clampd(m_temperature, 15.0, 45.0);
-    s.temperature = m_temperature;
 
-    // ---- 湿度：小幅波动，范围约束在 20~90 % ----
-    m_humidity += (rng->bounded(100) - 50) / 25.0;      // 约 ±2 % 抖动
+    m_humidity += (rng->bounded(100) - 50) / 25.0;
     m_humidity = clampd(m_humidity, 20.0, 90.0);
-    s.humidity = m_humidity;
 
-    // ---- 气体状态：大概率正常，偶尔预警/报警 ----
-    int gasRoll = rng->bounded(100);
-    if (gasRoll < 85)      s.gasLevel = LEVEL_NORMAL;
-    else if (gasRoll < 96) s.gasLevel = LEVEL_WARNING;
-    else                   s.gasLevel = LEVEL_ALARM;
+    m_gas += (rng->bounded(100) - 48) / 2000.0;
+    m_gas = clampd(m_gas, 0.05, 0.7);
 
-    // ---- 振动状态：大概率正常，偶尔预警/报警 ----
-    int vibRoll = rng->bounded(100);
-    if (vibRoll < 88)      s.vibrationLevel = LEVEL_NORMAL;
-    else if (vibRoll < 97) s.vibrationLevel = LEVEL_WARNING;
-    else                   s.vibrationLevel = LEVEL_ALARM;
+    m_vibration += (rng->bounded(100) - 48) / 220.0;
+    m_vibration = clampd(m_vibration, 0.2, 2.8);
 
-    // ---- 云端连接：偶尔断开再恢复（约 3% 概率翻转状态）----
     if (rng->bounded(100) < 3) {
         m_cloud = !m_cloud;
     }
-    s.cloudConnected = m_cloud;
 
-    // ---- 语音状态：在三种状态间随机切换 ----
-    s.voiceState = rng->bounded(3);   // 0/1/2
+    SystemStatus status;
+    status.deviceId = QStringLiteral("mock_hmi");
+    status.temperature = m_temperature;
+    status.humidity = m_humidity;
+    status.gasValue = m_gas;
+    status.vibrationValue = m_vibration;
+    status.currentValue = 1.8;
+    status.gasLevel = levelFromHighThreshold(m_gas, 0.3, 0.6);
+    status.vibrationLevel = levelFromHighThreshold(m_vibration, 1.5, 2.5);
+    status.cloudConnected = m_cloud;
+    status.voiceState = rng->bounded(3);
+    status.alarmLevel = std::max(status.gasLevel, status.vibrationLevel);
+    status.statusText = levelToText(status.alarmLevel);
+    status.analysisMode = QStringLiteral("hmi_mock");
+    status.timestamp = QDateTime::currentDateTime();
 
-    // ---- 总体系统状态：取气体与振动的较高等级 ----
-    s.alarmLevel = std::max(s.gasLevel, s.vibrationLevel);
-
-    // ---- 报警信息：仅在出现预警/报警时填写，供上层写入日志 ----
-    if (s.gasLevel == LEVEL_ALARM) {
-        s.alarmMessage = QStringLiteral("气体报警");
-    } else if (s.vibrationLevel == LEVEL_ALARM) {
-        s.alarmMessage = QStringLiteral("振动报警");
-    } else if (s.gasLevel == LEVEL_WARNING) {
-        s.alarmMessage = QStringLiteral("气体预警");
-    } else if (s.vibrationLevel == LEVEL_WARNING) {
-        s.alarmMessage = QStringLiteral("振动预警");
-    } else {
-        s.alarmMessage.clear();
+    if (status.gasLevel == LEVEL_ALARM) {
+        status.alarmMessage = QStringLiteral("气体浓度达到报警阈值");
+    } else if (status.vibrationLevel == LEVEL_ALARM) {
+        status.alarmMessage = QStringLiteral("振动达到报警阈值");
+    } else if (status.gasLevel == LEVEL_WARNING) {
+        status.alarmMessage = QStringLiteral("气体浓度达到预警阈值");
+    } else if (status.vibrationLevel == LEVEL_WARNING) {
+        status.alarmMessage = QStringLiteral("振动达到预警阈值");
     }
 
-    s.timestamp = QDateTime::currentDateTime();
+    if (status.alarmLevel == LEVEL_NORMAL) {
+        status.suggestion = QStringLiteral("保持常规监测");
+        status.voiceText = QStringLiteral("当前设备运行正常。");
+    } else {
+        status.suggestion = QStringLiteral("请检查现场状态，重点关注异常指标。");
+        status.voiceText = QStringLiteral("当前设备处于预警或报警状态，请检查现场。");
+    }
 
-    emit statusUpdated(s);
+    emit statusUpdated(status);
 }

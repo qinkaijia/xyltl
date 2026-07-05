@@ -22,12 +22,14 @@ set(SOURCES
     src/MainWindow.cpp
     src/StatusModel.cpp
     src/MockDataProvider.cpp
+    src/FinalStatusDataProvider.cpp
 )
 
 set(HEADERS
     src/SystemStatus.h
     src/IDataProvider.h
     src/MockDataProvider.h
+    src/FinalStatusDataProvider.h
     src/StatusModel.h
     src/MainWindow.h
 )

@@ -1,0 +1,22 @@
+{
+  "name": "sensor_offline",
+  "request": {
+    "device_id": "scenario_sensor_offline",
+    "metrics": {
+      "temperature": 30.0,
+      "humidity": 50.0,
+      "gas": 0.1,
+      "vibration": 0.5,
+      "current": 1.0
+    },
+    "system_state": {
+      "cloud_connected": true,
+      "voice_state": "idle",
+      "sensor_online": false
+    },
+    "include_debug": true
+  },
+  "expected": {
+    "alarm_level": 2
+  }
+}

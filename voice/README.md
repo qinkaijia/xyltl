@@ -1,14 +1,44 @@
 # voice
 
-语音唤醒、识别和播报模块目录。
+语音唤醒、识别和播报模块目录。当前阶段新增 `voice_text_player.py`，用于把 SafeCloud/analyzer 返回的 `final_status.voice_text` 接入播报链路。
 
-当前保留工程框架；命令行版语音交互核心 demo 已放在仓库顶层 `voice_llm_demo/`，便于直接同步到开发板的 `~/voice_llm_demo` 运行。
+## voice_text 播报
 
-本目录规划：
+默认使用 print 模式，便于板端无 TTS 环境时联调：
 
-- `src/`：语音模块通用代码。
-- `wakeword/`：唤醒词。
-- `asr/`：语音识别。
-- `tts/`：语音播报。
+```bash
+python3 voice/voice_text_player.py --input-file runtime/latest_evaluate_response.json --mode print
+```
 
-后续先使用文本指令 mock 语音输入，再接入真实语音链路。
+也可以从标准输入读取：
+
+```bash
+cat runtime/latest_evaluate_response.json | python3 voice/voice_text_player.py --input-file - --mode print
+```
+
+如板端安装了语音合成工具，可切换：
+
+```bash
+VOICE_TTS_MODE=espeak python3 voice/voice_text_player.py --input-file runtime/latest_evaluate_response.json
+VOICE_TTS_MODE=spd-say python3 voice/voice_text_player.py --input-file runtime/latest_evaluate_response.json
+```
+
+如果 TTS 命令不可用，脚本会回退打印文本，不会让主流程崩溃。
+
+## 与 2K1000LA 客户端联动
+
+`app_2k1000la/cloud_client.py` 支持直接播报：
+
+```bash
+python3 app_2k1000la/cloud_client.py \
+  --base-url http://192.168.14.20:8000 \
+  --scenario-file tests/scenarios/evaluate/temperature_warning.json \
+  --output-file runtime/latest_evaluate_response.json \
+  --include-debug \
+  --speak \
+  --tts-mode print
+```
+
+## 说明
+
+命令行语音交互 demo 仍在 `voice_llm_demo/` 中维护，用于 VAD、ASR、LLM 和命令执行链路。
