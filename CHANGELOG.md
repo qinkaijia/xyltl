@@ -14,3 +14,7 @@
 - 增加 `voice/voice_text_player.py`，支持从 `voice_text` 做 print/espeak/spd-say 播报。
 - 增加五类场景化 mock 数据和 SafeCloud 场景测试。
 - 增加 2K1000LA SafeCloud HTTP 客户端，支持请求 `/api/evaluate`、写出响应、语音播报和本地超时回退。
+- 增加 SafeCloud UDP 自动发现 responder，以及板端自动发现、缓存和手动配置兜底。
+- 为板端客户端增加 `--loop` 常驻轮询模式。
+- Qt HMI 增加云端延迟和模型来源显示。
+- 语音播报桥增加预录 wav 音频模式。

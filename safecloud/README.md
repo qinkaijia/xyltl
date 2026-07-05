@@ -35,10 +35,36 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
+## UDP 自动发现
+
+比赛现场网络经常变化时，可以同时启动 UDP discovery responder：
+
+```bash
+cd safecloud
+python discovery_responder.py --bind-host 0.0.0.0 --discovery-port 8011 --service-port 8010
+```
+
+板端 `app_2k1000la/cloud_client.py` 会广播 `SAFECLOUD_DISCOVER`，收到回复后自动得到类似：
+
+```json
+{
+  "service": "SafeCloud",
+  "base_url": "http://192.168.43.5:8010"
+}
+```
+
+成功后地址会缓存在板端 `~/.xylt_safecloud.json`，换网络后会自动重新发现。
+
 或使用脚本：
 
 ```bash
 SAFECLOUD_HOST=0.0.0.0 SAFECLOUD_PORT=8000 ../scripts/run/run_safecloud.sh
+```
+
+发现服务脚本：
+
+```bash
+SAFECLOUD_PORT=8010 SAFECLOUD_DISCOVERY_PORT=8011 ../scripts/run/run_safecloud_discovery.sh
 ```
 
 启动后访问：

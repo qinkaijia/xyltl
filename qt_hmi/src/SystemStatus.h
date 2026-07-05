@@ -33,6 +33,8 @@ struct SystemStatus {
     QString suggestion;
     QString voiceText;
     QString analysisMode;
+    QString modelSource;
+    int cloudLatencyMs = -1;
     QDateTime timestamp;
 };
 

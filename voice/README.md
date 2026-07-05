@@ -23,6 +23,17 @@ VOICE_TTS_MODE=espeak python3 voice/voice_text_player.py --input-file runtime/la
 VOICE_TTS_MODE=spd-say python3 voice/voice_text_player.py --input-file runtime/latest_evaluate_response.json
 ```
 
+预录音频模式：
+
+```bash
+mkdir -p voice/audio
+# 可放入 normal.wav、warning.wav、alarm.wav、default.wav
+VOICE_TTS_MODE=audio VOICE_AUDIO_DIR=voice/audio \
+  python3 voice/voice_text_player.py --input-file runtime/latest_evaluate_response.json
+```
+
+`audio` 模式会根据文本中是否包含“正常 / 预警 / 报警”选择对应 wav，并通过 `aplay` 播放；缺少音频文件时回退打印。
+
 如果 TTS 命令不可用，脚本会回退打印文本，不会让主流程崩溃。
 
 ## 与 2K1000LA 客户端联动

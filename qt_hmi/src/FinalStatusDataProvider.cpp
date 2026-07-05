@@ -3,7 +3,9 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
+#include <QStringList>
 #include <QTimer>
 
 static const int kPollIntervalMs = 1000;
@@ -60,9 +62,10 @@ bool FinalStatusDataProvider::loadStatus(SystemStatus *status)
         return false;
     }
 
-    QJsonObject obj = doc.object();
-    if (obj.contains(QStringLiteral("final_status")) && obj.value(QStringLiteral("final_status")).isObject()) {
-        obj = obj.value(QStringLiteral("final_status")).toObject();
+    const QJsonObject root = doc.object();
+    QJsonObject obj = root;
+    if (root.contains(QStringLiteral("final_status")) && root.value(QStringLiteral("final_status")).isObject()) {
+        obj = root.value(QStringLiteral("final_status")).toObject();
     }
 
     status->deviceId = obj.value(QStringLiteral("device_id")).toString();
@@ -78,6 +81,26 @@ bool FinalStatusDataProvider::loadStatus(SystemStatus *status)
     status->suggestion = obj.value(QStringLiteral("suggestion")).toString();
     status->voiceText = obj.value(QStringLiteral("voice_text")).toString();
     status->analysisMode = obj.value(QStringLiteral("analysis_mode")).toString();
+    if (root.value(QStringLiteral("debug")).isObject()) {
+        const QJsonObject debug = root.value(QStringLiteral("debug")).toObject();
+        if (debug.value(QStringLiteral("client")).isObject()) {
+            status->cloudLatencyMs = debug.value(QStringLiteral("client")).toObject()
+                                         .value(QStringLiteral("elapsed_ms")).toInt(-1);
+        }
+        if (debug.value(QStringLiteral("model_results")).isArray()) {
+            const QJsonArray models = debug.value(QStringLiteral("model_results")).toArray();
+            QStringList names;
+            for (const QJsonValue &value : models) {
+                if (value.isObject()) {
+                    const QString name = value.toObject().value(QStringLiteral("model_name")).toString();
+                    if (!name.isEmpty()) {
+                        names.append(name);
+                    }
+                }
+            }
+            status->modelSource = names.join(QStringLiteral(","));
+        }
+    }
 
     const QString timestampText = obj.value(QStringLiteral("timestamp")).toString();
     status->timestamp = QDateTime::fromString(timestampText, Qt::ISODate);

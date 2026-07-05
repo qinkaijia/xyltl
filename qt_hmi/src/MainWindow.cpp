@@ -161,13 +161,17 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
 
     const QString reason = s.alarmMessage.isEmpty() ? QStringLiteral("暂无异常说明") : s.alarmMessage;
     const QString suggestion = s.suggestion.isEmpty() ? QStringLiteral("保持常规监测") : s.suggestion;
+    const QString latency = s.cloudLatencyMs >= 0 ? QStringLiteral("%1 ms").arg(s.cloudLatencyMs) : QStringLiteral("--");
+    const QString models = s.modelSource.isEmpty() ? QStringLiteral("--") : s.modelSource;
     m_infoLabel->setText(
-        QStringLiteral("%1  设备:%2  温度:%3 C  湿度:%4 %  模式:%5\n原因:%6\n建议:%7")
+        QStringLiteral("%1  设备:%2  温度:%3 C  湿度:%4 %  模式:%5  延迟:%6  模型:%7\n原因:%8\n建议:%9")
             .arg(s.timestamp.toString("HH:mm:ss"))
             .arg(s.deviceId.isEmpty() ? QStringLiteral("--") : s.deviceId)
             .arg(s.temperature, 0, 'f', 1)
             .arg(s.humidity, 0, 'f', 0)
             .arg(s.analysisMode.isEmpty() ? QStringLiteral("mock") : s.analysisMode)
+            .arg(latency)
+            .arg(models)
             .arg(reason)
             .arg(suggestion));
 

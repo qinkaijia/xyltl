@@ -18,6 +18,7 @@ def extract_voice_text(payload: Dict[str, Any]) -> str:
 class VoiceTextPlayer:
     def __init__(self, mode: str = "") -> None:
         self.mode = mode or os.environ.get("VOICE_TTS_MODE", "print")
+        self.audio_dir = Path(os.environ.get("VOICE_AUDIO_DIR", "voice/audio"))
 
     def speak(self, text: str) -> bool:
         text = text.strip()
@@ -34,9 +35,28 @@ class VoiceTextPlayer:
             return self._run(["espeak", "-v", "zh", text], text)
         if self.mode == "spd-say":
             return self._run(["spd-say", text], text)
+        if self.mode == "audio":
+            return self._play_audio(text)
 
         print(f"[voice] 未知 VOICE_TTS_MODE={self.mode}，回退打印：{text}")
         return True
+
+    def _play_audio(self, text: str) -> bool:
+        audio_path = self._audio_path_for_text(text)
+        if not audio_path.exists():
+            print(f"[voice] 预录音频不存在，回退打印：{text}")
+            print(f"[voice] 缺少文件：{audio_path}")
+            return False
+        return self._run(["aplay", str(audio_path)], text)
+
+    def _audio_path_for_text(self, text: str) -> Path:
+        if "报警" in text:
+            return self.audio_dir / "alarm.wav"
+        if "预警" in text:
+            return self.audio_dir / "warning.wav"
+        if "正常" in text:
+            return self.audio_dir / "normal.wav"
+        return self.audio_dir / "default.wav"
 
     @staticmethod
     def _run(command: list[str], fallback_text: str) -> bool:
@@ -58,7 +78,7 @@ def load_payload(path: str) -> Dict[str, Any]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Speak voice_text from SafeCloud/analyzer JSON.")
     parser.add_argument("--input-file", default="-", help="Response JSON file, or '-' for stdin.")
-    parser.add_argument("--mode", default="", choices=["", "print", "none", "espeak", "spd-say"])
+    parser.add_argument("--mode", default="", choices=["", "print", "none", "espeak", "spd-say", "audio"])
     return parser.parse_args()
 
 

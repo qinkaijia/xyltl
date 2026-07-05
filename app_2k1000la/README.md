@@ -9,10 +9,36 @@
 功能：
 
 - 读取场景化 mock JSON。
-- 调用 SafeCloud `POST /api/evaluate`。
+- 自动发现或手动调用 SafeCloud `POST /api/evaluate`。
 - 将返回结果写入本地 JSON，供 Qt HMI 使用。
 - 请求失败、超时或返回异常时，使用端侧本地阈值规则生成 `local_http_fallback`。
 - 可选 `--speak`，把 `final_status.voice_text` 交给 `voice/voice_text_player.py` 播报。
+- 可选 `--loop`，作为简易常驻轮询进程运行。
+
+## 自动网络适配
+
+客户端查找 SafeCloud 的优先级：
+
+1. 命令行 `--base-url`
+2. 环境变量 `SAFECLOUD_BASE_URL`
+3. 上次成功连接缓存 `~/.xylt_safecloud.json`
+4. UDP 广播自动发现，默认端口 `8011`
+5. 全部失败时走本地规则回退
+
+自动发现用法：
+
+```bash
+python3 app_2k1000la/cloud_client.py \
+  --scenario-file tests/scenarios/evaluate/temperature_warning.json \
+  --output-file runtime/latest_evaluate_response.json \
+  --include-debug
+```
+
+手动覆盖：
+
+```bash
+export SAFECLOUD_BASE_URL=http://192.168.43.5:8010
+```
 
 示例：
 
@@ -24,6 +50,17 @@ python3 app_2k1000la/cloud_client.py \
   --include-debug \
   --speak \
   --tts-mode print
+```
+
+常驻轮询：
+
+```bash
+python3 app_2k1000la/cloud_client.py \
+  --scenario-file tests/scenarios/evaluate/normal.json \
+  --output-file runtime/latest_evaluate_response.json \
+  --include-debug \
+  --loop \
+  --interval 2
 ```
 
 真实 LLM 调试：

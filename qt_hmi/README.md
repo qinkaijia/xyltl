@@ -70,4 +70,5 @@ HMI 读取该文件：
 - 温度、湿度、气体、振动、云端状态、系统状态。
 - `reason` 和 `suggestion` 显示在中部信息区。
 - `voice_text` 在底部状态栏展示，后续可与语音播报模块联动。
+- 当输入文件包含 `debug.client.elapsed_ms` 和 `debug.model_results` 时，HMI 会展示云端响应延迟和模型来源。
 - 报警/预警会写入报警日志。
