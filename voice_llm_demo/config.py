@@ -3,6 +3,20 @@
 import os
 
 
+def _float_env(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
 def _load_local_env() -> None:
     """Load optional KEY=VALUE pairs from .env without adding extra dependencies."""
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -29,14 +43,16 @@ SAMPLE_RATE = 16000
 CHANNELS = 1
 SAMPLE_WIDTH = 2
 FRAME_MS = 30
+AUDIO_DEVICE = os.environ.get("AUDIO_DEVICE", "")
 
-NOISE_CALIBRATION_SECONDS = 1.0
-START_SPEECH_FRAMES = 3
-END_SILENCE_SECONDS = 1.0
-MAX_RECORD_SECONDS = 10.0
-MIN_RECORD_SECONDS = 0.5
-THRESHOLD_RATIO = 3.0
-MIN_ABSOLUTE_THRESHOLD = 300
+NOISE_CALIBRATION_SECONDS = _float_env("NOISE_CALIBRATION_SECONDS", 1.0)
+START_SPEECH_FRAMES = _int_env("START_SPEECH_FRAMES", 3)
+END_SILENCE_SECONDS = _float_env("END_SILENCE_SECONDS", 1.0)
+MAX_RECORD_SECONDS = _float_env("MAX_RECORD_SECONDS", 10.0)
+MIN_RECORD_SECONDS = _float_env("MIN_RECORD_SECONDS", 0.5)
+THRESHOLD_RATIO = _float_env("THRESHOLD_RATIO", 3.0)
+MIN_ABSOLUTE_THRESHOLD = _float_env("MIN_ABSOLUTE_THRESHOLD", 300.0)
+CONTINUOUS_INTERVAL_SECONDS = float(os.environ.get("CONTINUOUS_INTERVAL_SECONDS", "0.2"))
 
 USE_REAL_LLM = False
 

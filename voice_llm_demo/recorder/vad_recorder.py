@@ -60,6 +60,8 @@ class VADRecorder:
             "raw",
             "-",
         ]
+        if config.AUDIO_DEVICE:
+            command[2:2] = ["-D", config.AUDIO_DEVICE]
 
         process = None
         try:

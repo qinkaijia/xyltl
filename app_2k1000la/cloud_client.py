@@ -16,6 +16,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from app_2k1000la.sensor_source import (
+    DEFAULT_SCENARIO_FILE,
+    Mqtt2K0301Config,
+    SensorSourceError,
+    apply_runtime_options,
+    create_sensor_source,
+)
+
 try:
     from voice.voice_text_player import VoiceTextPlayer, extract_voice_text
 except ImportError:
@@ -284,7 +292,13 @@ def speak_response(response: Dict[str, Any], tts_mode: str = "") -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="2K1000LA SafeCloud /api/evaluate client")
     parser.add_argument("--base-url", default="", help="Manual SafeCloud base URL. Overrides discovery.")
-    parser.add_argument("--scenario-file", required=True)
+    parser.add_argument(
+        "--sensor-source",
+        default="scenario",
+        choices=["scenario", "mock", "2k0301"],
+        help="Sensor input source: one scenario file, cycling mock scenarios, or MQTT 2K0301 bridge.",
+    )
+    parser.add_argument("--scenario-file", default=DEFAULT_SCENARIO_FILE)
     parser.add_argument("--output-file", default="")
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--use-real-llm", action="store_true")
@@ -298,15 +312,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-discovery", action="store_true")
     parser.add_argument("--loop", action="store_true", help="Run as a simple resident polling process.")
     parser.add_argument("--interval", type=float, default=5.0)
+    parser.add_argument("--mqtt-host", default="", help="2K0301 MQTT broker host. Defaults to env or 127.0.0.1.")
+    parser.add_argument("--mqtt-port", type=int, default=0, help="2K0301 MQTT broker port. Defaults to env or 1883.")
+    parser.add_argument("--mqtt-qos", type=int, default=-1, choices=[-1, 0, 1, 2])
+    parser.add_argument("--mqtt-sensor-topic", default="")
+    parser.add_argument("--mqtt-heartbeat-topic", default="")
+    parser.add_argument("--mqtt-ack-topic", default="")
+    parser.add_argument("--mqtt-error-topic", default="")
+    parser.add_argument("--mqtt-command-topic", default="")
+    parser.add_argument("--mqtt-first-timeout", type=float, default=0.0)
+    parser.add_argument("--mqtt-stale-after", type=float, default=0.0)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    payload = load_scenario(args.scenario_file)
-    payload["use_real_llm"] = bool(args.use_real_llm)
-    payload["force_model"] = args.force_model
-    payload["include_debug"] = bool(args.include_debug)
+    try:
+        sensor_source = create_sensor_source(args.sensor_source, args.scenario_file, build_mqtt_config(args))
+    except SensorSourceError as exc:
+        raise SystemExit(f"数据源初始化失败：{exc}") from exc
 
     base_url, source = resolve_base_url(
         args.base_url,
@@ -319,10 +343,46 @@ def main() -> None:
     client = SafeCloudClient(base_url, args.timeout)
 
     while True:
+        try:
+            payload = apply_runtime_options(
+                sensor_source.next_payload(),
+                args.use_real_llm,
+                args.force_model,
+                args.include_debug,
+            )
+        except SensorSourceError as exc:
+            raise SystemExit(f"数据源读取失败：{exc}") from exc
         run_once(args, client, payload)
         if not args.loop:
             break
         time.sleep(args.interval)
+
+
+def build_mqtt_config(args: argparse.Namespace) -> Optional[Mqtt2K0301Config]:
+    if args.sensor_source != "2k0301":
+        return None
+    config = Mqtt2K0301Config.from_env()
+    if args.mqtt_host:
+        config.host = args.mqtt_host
+    if args.mqtt_port > 0:
+        config.port = args.mqtt_port
+    if args.mqtt_qos >= 0:
+        config.qos = args.mqtt_qos
+    if args.mqtt_sensor_topic:
+        config.sensor_topic = args.mqtt_sensor_topic
+    if args.mqtt_heartbeat_topic:
+        config.heartbeat_topic = args.mqtt_heartbeat_topic
+    if args.mqtt_ack_topic:
+        config.ack_topic = args.mqtt_ack_topic
+    if args.mqtt_error_topic:
+        config.error_topic = args.mqtt_error_topic
+    if args.mqtt_command_topic:
+        config.command_topic = args.mqtt_command_topic
+    if args.mqtt_first_timeout > 0:
+        config.first_message_timeout = args.mqtt_first_timeout
+    if args.mqtt_stale_after > 0:
+        config.stale_after_seconds = args.mqtt_stale_after
+    return config
 
 
 if __name__ == "__main__":

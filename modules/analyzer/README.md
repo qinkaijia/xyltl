@@ -33,6 +33,12 @@ python modules/analyzer/src/main.py --input-json "{\"device_id\":\"device_002\",
 modules/analyzer/runtime/system_status.json
 ```
 
+如需让 SafeCloud 或测试进程把结果写到运行目录，避免覆盖仓库内示例文件，可设置：
+
+```bash
+export ANALYZER_OUTPUT_PATH=output/safecloud_system_status.json
+```
+
 ## 真实 API 调用
 
 复制示例环境文件并填入自己的密钥：
@@ -75,6 +81,7 @@ QWEN_API_KEY / QWEN_API_URL / QWEN_MODEL
 ```
 
 `ANALYZER_LLM_TIMEOUT` 可设置请求超时时间，默认 30 秒。
+`ANALYZER_OUTPUT_PATH` 可覆盖 analyzer 输出 JSON 路径；相对路径按仓库根目录解析。
 
 ## 回退策略
 

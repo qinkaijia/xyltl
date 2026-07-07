@@ -33,6 +33,8 @@ voice_llm_demo/
     safety_guard.py
   data/recorded/
   logs/
+  tools/
+    audio_capture_probe.py
 ```
 
 ## 安装依赖
@@ -66,6 +68,42 @@ python3 main.py
 ```
 
 按 Enter 后程序会监听麦克风并自动录音，随后调用 `ASRClient.transcribe(audio_path)`。ASR 返回文本后，主流程继续交给 LLM、SafetyGuard 和 CommandDispatcher。
+
+## 持续监听真实收音
+
+正式演示时可使用持续监听模式，不再每轮按 Enter：
+
+```bash
+python3 main.py --continuous --audio-device hw:1,0
+```
+
+说明：
+
+- `--continuous` 会一直监听麦克风，VAD 检测到人声后自动录音、ASR、LLM 分析和安全校验。
+- `--audio-device` 对应 `arecord -l` 中的设备号；例如板端 USB 声卡常见为 `hw:1,0`。
+- 如果不传 `--audio-device`，使用系统默认录音设备。
+- 当前仍保留 manual ASR 兜底；未配置云端 ASR 时，录音完成后会要求手动输入识别文本。
+- 如果只想验证实时收音，不进入 ASR/LLM，可加 `--listen-only`：
+
+```bash
+python3 main.py --continuous --listen-only --audio-device hw:1,0
+```
+
+现场噪声导致误触发时，可临时调高阈值：
+
+```bash
+MIN_ABSOLUTE_THRESHOLD=800 THRESHOLD_RATIO=4.0 \
+  python3 main.py --continuous --listen-only --audio-device hw:1,0
+```
+
+先做麦克风探针测试：
+
+```bash
+python3 tools/audio_capture_probe.py --device hw:1,0 --seconds 2 --output data/recorded/probe.wav
+aplay data/recorded/probe.wav
+```
+
+探针会输出 RMS 和峰值；如果峰值很低，优先检查是否选错设备、麦克风静音或输入增益太低。
 
 ## 切换 ASR 模式
 
@@ -181,6 +219,7 @@ python3 main.py
 
 ```bash
 arecord -l
+python3 tools/audio_capture_probe.py --device hw:1,0 --seconds 2 --output data/recorded/probe.wav
 arecord -q -f S16_LE -r 16000 -c 1 -d 4 test.wav
 aplay test.wav
 python3 main.py
@@ -208,6 +247,13 @@ alsamixer
 
 确认麦克风或 USB 声卡已插好，输入通道没有静音。
 
+如果板端同时存在板载声卡和 USB 声卡，推荐显式指定设备：
+
+```bash
+python3 main.py --list-audio
+python3 main.py --continuous --audio-device hw:1,0
+```
+
 ### 录音一直不停止
 
 可能环境噪声过大，或麦克风增益太高。可在 `config.py` 中调整：
@@ -216,6 +262,8 @@ alsamixer
 - `MIN_ABSOLUTE_THRESHOLD`
 - `END_SILENCE_SECONDS`
 - `MAX_RECORD_SECONDS`
+
+这些参数也支持同名环境变量，方便板端现场调试。
 
 ### 百度 ASR 报错
 

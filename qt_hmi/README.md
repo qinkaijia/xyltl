@@ -71,4 +71,43 @@ HMI 读取该文件：
 - `reason` 和 `suggestion` 显示在中部信息区。
 - `voice_text` 在底部状态栏展示，后续可与语音播报模块联动。
 - 当输入文件包含 `debug.client.elapsed_ms` 和 `debug.model_results` 时，HMI 会展示云端响应延迟和模型来源。
+- 点击右上角“模型详情”可查看 `/api/evaluate` 返回的调试信息，包括云端请求、模型路由、本地规则、各模型输出和仲裁结果。
 - 报警/预警会写入报警日志。
+
+## 模型详情
+
+模型详情弹窗依赖 `cloud_client.py --include-debug` 写出的完整响应。推荐板端联调命令：
+
+```bash
+python3 app_2k1000la/cloud_client.py \
+  --scenario-file tests/scenarios/evaluate/gas_alarm.json \
+  --output-file runtime/latest_evaluate_response.json \
+  --include-debug \
+  --loop \
+  --interval 2
+```
+
+HMI 读取同一个输出文件：
+
+```bash
+./build_qmake/display_qt_app --fullscreen --status-file runtime/latest_evaluate_response.json
+```
+
+## 小屏和双屏显示
+
+板端如果同时接了 800x480 小屏和 HDMI，X11 可能把两个屏幕拼成一个大桌面。可显式指定屏幕和窗口尺寸：
+
+```bash
+./build_qmake/display_qt_app \
+  --compact \
+  --screen DPI-1 \
+  --geometry 780x450+10+10 \
+  --status-file runtime/latest_evaluate_response.json
+```
+
+说明：
+
+- `--compact`：降低字号、间距和日志区高度，适配 800x480。
+- `--screen DPI-1`：优先把窗口放到板载小屏；HDMI 通常是 `HDMI-1`。
+- `--geometry 780x450+10+10`：窗口模式，可拖拽；不要同时加 `--fullscreen`。
+- `--fullscreen` 是展台/锁屏模式，窗口不能拖拽，属于正常现象。

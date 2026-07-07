@@ -24,6 +24,7 @@
 - `protocol/`：统一通信协议 JSON Schema。
 - `scripts/`：环境检查、部署、运行和日志脚本。
 - `hardware_refs/`：龙芯开发板和硬件参考资料。
+- `docs/competition/`：赛题要求摘要和方向约束文档。
 
 ## 当前状态
 
@@ -36,9 +37,16 @@
 - Analyzer 已在龙芯 2K1000LA 板端完成真实 API 联调：DeepSeek、Kimi、智谱、豆包、通义均可调用。
 - 语音命令行 demo：VAD 录音、manual / 百度 / 讯飞 ASR 可切换、MockLLM、安全校验和模拟命令执行。
 - Qt HMI 原型和 SafeCloud Web Dashboard 原型。
+- SafeCloud Web Dashboard 已增加安全评估面板，可直接选择模拟场景调用 `/api/evaluate`。
+- 板端 SafeCloud 轮询客户端已支持用户级 systemd 托管，默认持续写出 `runtime/latest_evaluate_response.json`。
+- 板端 SafeCloud 轮询客户端已抽象 `scenario/mock/2k0301` 数据源，`2k0301` 已实现 MQTT 数据源入口，等待板端实测。
+- Qt HMI 已可读取该输出文件，并提供模型结果详情弹窗查看路由、模型输出和仲裁结果。
+- Qt HMI 已支持 800x480 紧凑显示、屏幕选择和窗口几何参数。
+- 语音命令行 demo 已支持持续监听真实收音、listen-only 收音探针和 ALSA 设备选择。
 
 下一步：
 
-- 用板端 HTTP 客户端调用 Windows/云端 SafeCloud `/api/evaluate`。
-- 将 `/api/evaluate` 返回的 `final_status` 接入 Qt、语音播报和后续板间通信。
+- 调优板端 VAD 参数并接入百度/讯飞 ASR 做端到端语音识别。
+- 使用 `--sensor-source 2k0301` 做 MQTT 实测，确认 301 上报数据能替换 mock `metrics`。
+- 将 `final_status` 继续接入后续板间通信和本地执行控制。
 - 逐步用真实传感器和执行器替换 mock 数据。

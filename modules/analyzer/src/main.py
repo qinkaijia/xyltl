@@ -38,7 +38,7 @@ DEFAULT_INPUT = {
 def run_demo(input_data: dict, force_model: str = "") -> dict:
     thresholds_path = MODULE_DIR / "config" / "thresholds.json"
     llm_config_path = MODULE_DIR / "config" / "llm_config.yaml"
-    output_path = MODULE_DIR / "runtime" / "system_status.json"
+    output_path = _output_path()
 
     sensor_data = SensorData.from_dict(input_data)
     system_state = SystemState.from_dict(input_data)
@@ -82,6 +82,14 @@ def run_demo(input_data: dict, force_model: str = "") -> dict:
         "judge_result": judge_result.to_dict(),
     }
     return result
+
+
+def _output_path() -> Path:
+    output_path_text = os.environ.get("ANALYZER_OUTPUT_PATH", "").strip()
+    if not output_path_text:
+        return MODULE_DIR / "runtime" / "system_status.json"
+    output_path = Path(output_path_text).expanduser()
+    return output_path if output_path.is_absolute() else REPO_ROOT / output_path
 
 
 def _analysis_mode(selected_models: list[str], model_results: list) -> str:
