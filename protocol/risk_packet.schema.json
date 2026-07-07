@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/safetyguardian/risk_packet.schema.json",
+  "title": "RiskPacket",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "risk_level",
+    "risk_name",
+    "risk_reasons",
+    "rule_hits",
+    "local_actions"
+  ],
+  "properties": {
+    "risk_level": { "type": "string", "enum": ["L0", "L1", "L2", "L3"] },
+    "risk_name": { "type": "string", "minLength": 1 },
+    "risk_reasons": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "rule_hits": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "local_actions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "temperature_warning",
+  "request": {
+    "device_id": "scenario_temperature_warning",
+    "metrics": {
+      "temperature": 65.0,
+      "humidity": 50.0,
+      "gas": 0.1,
+      "vibration": 0.5,
+      "current": 1.0
+    },
+    "system_state": {
+      "cloud_connected": true,
+      "voice_state": "idle",
+      "sensor_online": true
+    },
+    "include_debug": true
+  },
+  "expected": {
+    "alarm_level": 1
+  }
+}

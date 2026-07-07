@@ -1,74 +1,64 @@
-![longqiu](./MD_Image/longqiu.png)
+# SafetyGuardian-Loongson
 
-# 龙邱科技 龙芯2k301核心板软件开源库
+本仓库是"基于龙芯双处理器与多 LLM 仲裁的密闭空间智能安全监护仪"的工程框架与原型实现。
 
-## 1- 简介
-`Loongson_2k300_301_Library-V2.1.0`库，针对龙邱科技 龙芯2k301核心板常用外设资源和龙邱产品模块移植驱动例程，以方便参加智能车竞赛和使用我们产品的人入门学习使用，2k301和2k300基本上可以通用，仅内存形式不同、龙邱核心板与久久派引出引脚个别有所不同，故相关视频教程依旧可以参考龙邱2K300的。
+核心原则：端侧安全优先，云端智能增强。关键报警、排风等动作必须由本地规则兜底，LLM 负责解释、建议、仲裁和报告生成。
 
-工程默认使用开发环境为`Linux`系统下 ，可以使用`Ubuntu`或`WSL`，软件可使用`VScode`，请自行修改工程路径相关配置。
+## 开发模式
 
-## 2- 开发环境
+- Windows 主机：代码编写、文档管理、Git 提交、云端服务联调。
+- Linux VM：后续用于 LoongArch 交叉编译、依赖管理和本地服务测试。
+- 龙芯 2K1000LA 开发板：运行验证 HMI、语音、视觉、云端通信等端侧模块。
+- 龙芯 2K0301：后续负责传感器采集与执行控制。
 
-- 硬件平台：[龙邱龙芯2k301核心板](https://item.taobao.com/item.htm?id=1010690276497)
+## 顶层模块
 
-<img src="./MD_Image/image-%E9%BE%99%E8%8A%AF2k0301.png" alt="e623eb8145ee0237196290a5153ee2e1" style="zoom: 15%;" />
+- `firmware_2k301/`：2K0301 传感器采集与执行控制（基于龙邱科技 2K301 核心板开源库）。
+- `app_2k1000la/`：2K1000LA 主控应用。
+- `qt_hmi/`：Qt 5 HMI 显示界面。
+- `vision/`：摄像头与视觉识别模块占位。
+- `voice/`：语音唤醒、识别和播报模块占位。
+- `voice_llm_demo/`：命令行语音 + LLM 交互核心模块。
+- `safecloud/`：云端 SafeCloud 服务、Dashboard、设备 API 和 `/api/evaluate` 分析接口。
+- `modules/analyzer/`：本地规则 + 多 LLM 协同分析 + SafetyGuard 模块。
+- `protocol/`：统一通信协议 JSON Schema。
+- `scripts/`：环境检查、部署、运行和日志脚本。
+- `hardware_refs/`：龙芯开发板和硬件参考资料。
+- `docs/competition/`：赛题要求摘要和方向约束文档。
 
-如需了解龙芯久久派拓展版相关信息，可点击链接：[龙芯久久派拓展板](https://item.taobao.com/item.htm?id=1010690276497)了解详情。
+## firmware_2k301 说明
 
-<img src="./MD_Image/image-2K301%E6%8B%93%E5%B1%95%E6%9D%BF.png" alt="4d1821901fe89cf6e3704ac20d2f5be4" style="zoom:35%;" />
+`firmware_2k301/Loongson_2K300_301_LIB` 是龙邱科技提供的龙芯 2K301 核心板软件开源库（V2.1.0），包含：
 
-- 开发及编辑环境 `Ubuntu`+`VScode 1.93` 以上
+- **driver/**：I2C 驱动（MPU6050、ICM42688、LSM6DSR、VL53L0X、SHT30、SGP30 等）、TFT/IPS 屏幕驱动
+- **libraries/**：通用库（GPIO、PWM、I2C、SPI、UART、CANFD、NCNN、UDP/TCP 网络通信等）
+- **example/**：24 个示例 Demo
+- **main/**：主程序工程（CMake 构建，适用于龙芯 2K301 核心板）
+- **user_app/**：用户应用（MQ3 传感器监测、WiFi 连接等）
 
-## 3- 使用说明
+工程使用 Linux + VSCode + LoongArch 交叉编译工具链开发。
 
-1. 安装`Ubuntu`或`WSL`并安装`VScode`环境
-2. 下载或克隆库，本链接或购买产品的附赠资料中
-3. 打开软件导入工程，参考其他地方的教程手册以及B站相关的视频。
-4. 项目介绍：
-   - <font color="red">`LQ_ls2k301_LIB_V2.1.0`</font>是更新后的不带有测试例程的项目工程
-   - <font color="red">`根据龙邱2k301核心板的引脚资源分配.xlsx`</font>是根据拓展板写的引脚资源分配表格
-   - 其他详细教程内容可在B站查看相关教程：[龙邱科技的个人空间-龙邱科技个人主页-哔哩哔哩视频](https://space.bilibili.com/95313236)
+## 当前状态
 
-## 4- 更新日志
+已完成：
 
-   1. 更新内容 详见工程目录下的**历史版本更新记录.txt**文件
+- 仓库结构、Agent 开发规范、协议 Schema 初稿。
+- SafeCloud 最小可运行云端原型：设备、遥测、报警、命令、Dashboard。
+- SafeCloud `/api/evaluate`：接入 analyzer，可通过 HTTP 对模拟传感器数据做规则判断和多 LLM 分析。
+- Analyzer 模块：RuleEngine、TaskClassifier、ModelRouter、真实 LLM API 客户端、JudgeModel、SafetyGuard、JSON 输出。
+- Analyzer 已在龙芯 2K1000LA 板端完成真实 API 联调：DeepSeek、Kimi、智谱、豆包、通义均可调用。
+- 语音命令行 demo：VAD 录音、manual / 百度 / 讯飞 ASR 可切换、MockLLM、安全校验和模拟命令执行。
+- Qt HMI 原型和 SafeCloud Web Dashboard 原型。
+- SafeCloud Web Dashboard 已增加安全评估面板，可直接选择模拟场景调用 `/api/evaluate`。
+- 板端 SafeCloud 轮询客户端已支持用户级 systemd 托管，默认持续写出 `runtime/latest_evaluate_response.json`。
+- 板端 SafeCloud 轮询客户端已抽象 `scenario/mock/2k0301` 数据源，`2k0301` 已实现 MQTT 数据源入口，等待板端实测。
+- Qt HMI 已可读取该输出文件，并提供模型结果详情弹窗查看路由、模型输出和仲裁结果。
+- Qt HMI 已支持 800x480 紧凑显示、屏幕选择和窗口几何参数。
+- 语音命令行 demo 已支持持续监听真实收音、listen-only 收音探针和 ALSA 设备选择。
 
-## 5-相关资料
+下一步：
 
-- 21智能车走马观碑龙芯组别极轻量级分类模型训练开源文件NCNN模型推理资料链接: https://pan.baidu.com/s/1Yz7P73Ag9T31zfgbtxE6cA 提取码: tihd
-- 龙邱UDP_串口调试助手_LoongLiteTool（推荐龙芯图传调试使用 ） 链接: https://pan.baidu.com/s/1U47VfqdUgdESQEtqcL7plg 提取码: lqkj
-- 久久派升级资料 链接: https://pan.baidu.com/s/1rmMKmugk7zG4tMu-zrTjKA?pwd=kbm2 提取码: kbm2
-- 龙芯 2k301 板卡系统恢复资料 链接: https://pan.baidu.com/s/1qrdpp2M4RvcMFNsJYyTi7w 提取码: sq1e
-- 第21届全国大学生智能车竞赛---走马观碑组技术手册 https://blog.csdn.net/longqiu_LQ/article/details/156275409
-- 第21届智能汽车竞赛龙芯免费芯片申请函模板 https://pan.baidu.com/s/5L6d9CGmWGV-93EjFTYcudQ
-
-##  5-其他核心板类开源库
-
-   龙邱-核心板类开源库百度网盘链接：[https://pan.baidu.com/s/1exDJTBU4HdRVE5ne6-5LCA](https://gitee.com/link?target=https%3A%2F%2Fpan.baidu.com%2Fs%2F1exDJTBU4HdRVE5ne6-5LCA) 提取码：7sa3
-
-   其他开源库，陆续整理中。。。后续也会同步gitee
-
-## 6-关于资讯
-
-   其他关于龙邱科技，智能车相关资讯，敬请关注龙邱官方微信公众号：
-
-   ![image-20250218135059980](./MD_Image/%E5%BE%AE%E4%BF%A1%E5%85%AC%E4%BC%97%E5%8F%B7%E4%BA%8C%E7%BB%B4%E7%A0%81.png)
-
-   更多智能车和公司动态信息、文章会在此发布！
-
-
-
-
-----
-
-
-
-
-#### 特技
-
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+- 调优板端 VAD 参数并接入百度/讯飞 ASR 做端到端语音识别。
+- 使用 `--sensor-source 2k0301` 做 MQTT 实测，确认 301 上报数据能替换 mock `metrics`。
+- 将 `final_status` 继续接入后续板间通信和本地执行控制。
+- 逐步用真实传感器和执行器替换 mock 数据。

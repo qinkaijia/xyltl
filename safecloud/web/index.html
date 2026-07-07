@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SafeCloud 龙芯工业安全监护平台</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar" aria-label="SafeCloud 控制台">
+        <div class="brand-zone">
+          <div class="brand-row">
+            <div class="brand-mark" aria-hidden="true">
+              <span>龙芯</span>
+            </div>
+            <div class="brand-copy">
+              <p class="eyebrow">Loongson Edge Safety Cloud</p>
+              <h1>密闭空间智能安全监护平台</h1>
+            </div>
+          </div>
+          <div class="system-strip" aria-label="系统链路">
+            <span class="system-chip">2K0301 采集</span>
+            <span class="system-chip">MQTT 板间通信</span>
+            <span class="system-chip">2K1000LA 主控</span>
+            <span class="system-chip">SafeCloud 云端</span>
+            <span class="system-chip">多 LLM 仲裁</span>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <span class="competition-badge">嵌入式系统设计竞赛 · 龙芯赛道</span>
+          <label class="api-field">
+            <span>API</span>
+            <input id="apiBaseInput" type="url" aria-label="SafeCloud API 地址" />
+          </label>
+          <button id="refreshButton" class="icon-button" type="button" title="刷新数据" aria-label="刷新数据">↻</button>
+          <span id="connectionBadge" class="status-badge is-muted">未连接</span>
+        </div>
+      </header>
+
+      <main class="dashboard-main">
+        <nav class="page-tabs" aria-label="功能页面">
+          <button class="page-tab is-active" type="button" data-page-tab="overview" aria-selected="true">
+            <strong>监护总览</strong>
+            <span>Overview</span>
+          </button>
+          <button class="page-tab" type="button" data-page-tab="monitor" aria-selected="false">
+            <strong>环境监测</strong>
+            <span>Telemetry</span>
+          </button>
+          <button class="page-tab" type="button" data-page-tab="analysis" aria-selected="false">
+            <strong>AI 评估</strong>
+            <span>Multi-LLM</span>
+          </button>
+          <button class="page-tab" type="button" data-page-tab="operations" aria-selected="false">
+            <strong>告警控制</strong>
+            <span>Operations</span>
+          </button>
+        </nav>
+
+        <section class="page-view is-active" data-page-view="overview" aria-label="监护总览">
+          <section class="kpi-grid" aria-label="系统总览">
+            <article class="kpi-panel accent-teal">
+              <span class="kpi-label">接入设备</span>
+              <strong id="deviceTotal">0</strong>
+              <small>边缘节点与云端档案</small>
+            </article>
+            <article class="kpi-panel accent-green">
+              <span class="kpi-label">在线设备</span>
+              <strong id="onlineTotal">0</strong>
+              <small id="onlineRatio">0% 在线率</small>
+            </article>
+            <article class="kpi-panel accent-red">
+              <span class="kpi-label">活动报警</span>
+              <strong id="activeAlarmTotal">0</strong>
+              <small>待确认与处置</small>
+            </article>
+            <article class="kpi-panel accent-gold">
+              <span class="kpi-label">监测指标</span>
+              <strong id="metricTotal">0</strong>
+              <small id="metricNames">暂无指标</small>
+            </article>
+          </section>
+
+          <section class="overview-grid">
+            <article class="panel system-map-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">System Path</p>
+                  <h2>端云协同链路</h2>
+                </div>
+                <span class="muted">Edge first</span>
+              </div>
+              <div class="edge-map" aria-label="端云协同链路图">
+                <div class="edge-node primary">
+                  <span>2K0301</span>
+                  <strong>采集与执行</strong>
+                </div>
+                <div class="edge-line"></div>
+                <div class="edge-node">
+                  <span>2K1000LA</span>
+                  <strong>HMI / 语音 / 规则</strong>
+                </div>
+                <div class="edge-line"></div>
+                <div class="edge-node cloud">
+                  <span>SafeCloud</span>
+                  <strong>多模型分析</strong>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel priority-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Safety Priority</p>
+                  <h2>安全优先级</h2>
+                </div>
+                <span class="pill normal">Local Guard</span>
+              </div>
+              <div class="priority-list">
+                <div>
+                  <span>01</span>
+                  <strong>本地规则兜底</strong>
+                  <p>报警、排风、蜂鸣等关键动作不依赖云端在线状态。</p>
+                </div>
+                <div>
+                  <span>02</span>
+                  <strong>云端智能增强</strong>
+                  <p>复杂态势由多模型辅助分析，输出统一安全状态。</p>
+                </div>
+                <div>
+                  <span>03</span>
+                  <strong>板间协议稳定</strong>
+                  <p>2K0301 侧数据先标准化，再进入主控与云端流程。</p>
+                </div>
+              </div>
+            </article>
+          </section>
+        </section>
+
+        <section class="page-view" data-page-view="monitor" aria-label="环境监测">
+          <section class="monitor-grid">
+            <article class="panel telemetry-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Telemetry</p>
+                  <h2>最新环境数据</h2>
+                </div>
+                <span id="lastUpdated" class="muted">等待刷新</span>
+              </div>
+              <div id="metricBoard" class="metric-board empty-state">暂无遥测数据</div>
+            </article>
+
+            <article class="panel chart-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Trend</p>
+                  <h2>指标快照</h2>
+                </div>
+                <span class="muted">按最新数据归一化</span>
+              </div>
+              <canvas id="metricChart" width="720" height="260" aria-label="指标快照图"></canvas>
+            </article>
+          </section>
+        </section>
+
+        <section class="page-view" data-page-view="analysis" aria-label="AI 评估">
+          <article class="panel evaluate-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">LLM Evaluate</p>
+                <h2>多模型安全评估</h2>
+              </div>
+              <span id="evaluateStatus" class="muted">待评估</span>
+            </div>
+            <div class="evaluate-controls">
+              <label>
+                <span>场景</span>
+                <select id="evaluateScenario">
+                  <option value="normal">正常巡检</option>
+                  <option value="temperature_warning">高温预警</option>
+                  <option value="gas_alarm">气体报警</option>
+                  <option value="vibration_alarm">振动异常</option>
+                  <option value="sensor_offline">传感器离线</option>
+                </select>
+              </label>
+              <label>
+                <span>模型</span>
+                <select id="evaluateModel">
+                  <option value="">自动仲裁</option>
+                  <option value="mock">mock</option>
+                  <option value="deepseek">deepseek</option>
+                  <option value="kimi">kimi</option>
+                  <option value="zhipu">zhipu</option>
+                  <option value="doubao">doubao</option>
+                  <option value="qwen">qwen</option>
+                </select>
+              </label>
+              <label class="switch-line">
+                <input id="evaluateDebug" type="checkbox" checked />
+                <span>调试明细</span>
+              </label>
+              <label class="switch-line">
+                <input id="evaluateRealLlm" type="checkbox" />
+                <span>真实 LLM</span>
+              </label>
+              <button id="runEvaluateButton" class="primary-button" type="button">开始评估</button>
+            </div>
+            <div id="evaluateResult" class="evaluate-result empty-state">暂无评估结果</div>
+          </article>
+        </section>
+
+        <section class="page-view" data-page-view="operations" aria-label="告警控制">
+          <section class="ops-grid">
+            <article class="panel alarms-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Alarms</p>
+                  <h2>最近报警</h2>
+                </div>
+                <button id="loadAlarmsButton" class="text-button" type="button">查看全部</button>
+              </div>
+              <div id="alarmList" class="list empty-state">暂无报警</div>
+            </article>
+
+            <article class="panel devices-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Devices</p>
+                  <h2>设备状态</h2>
+                </div>
+                <span id="deviceStatusText" class="muted">暂无设备</span>
+              </div>
+              <div id="deviceList" class="device-list empty-state">暂无设备</div>
+            </article>
+
+            <article class="panel command-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Command</p>
+                  <h2>远程控制</h2>
+                </div>
+                <span id="commandResult" class="muted">未下发</span>
+              </div>
+              <form id="commandForm" class="command-form">
+                <label>
+                  <span>设备 ID</span>
+                  <select id="commandDevice"></select>
+                </label>
+                <label>
+                  <span>命令类型</span>
+                  <select id="commandType">
+                    <option value="fan_control">fan_control</option>
+                    <option value="alarm_light">alarm_light</option>
+                    <option value="buzzer_control">buzzer_control</option>
+                    <option value="device_reset">device_reset</option>
+                  </select>
+                </label>
+                <label>
+                  <span>参数 JSON</span>
+                  <textarea id="commandPayload" rows="4">{ "state": "on" }</textarea>
+                </label>
+                <button class="primary-button" type="submit">下发命令</button>
+              </form>
+            </article>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

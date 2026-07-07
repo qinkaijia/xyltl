@@ -1,0 +1,3 @@
+[submodule "loongson-safety-vision"]
+	path = loongson-safety-vision
+	url = https://github.com/AArcueid/loongson-safety-vision.git

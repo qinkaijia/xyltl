@@ -4,10 +4,17 @@ bin-release/
 [Oo]bj/
 [Bb]in/
 build/
+cmake-build-*/
+out/
+dist/
+output/
 
-# IDE
+# IDE and OS files
 .settings/
 .vscode/
+.idea/
+.DS_Store
+Thumbs.db
 
 # Compiled kernel modules
 *.ko
@@ -17,6 +24,7 @@ build/
 
 # Tools (toolchain, dependency libs - too large for git)
 Loongson_2K300_301_LIB/tools/
+tools/loongson-gnu-toolchain-*/
 
 # SCP deploy scripts (contain board IP info)
 **/scp_send.sh
@@ -34,6 +42,21 @@ Loongson_2K300_301_LIB/tools/
 面包板接线指南_五传感器.md
 PCB设计_极简版.md
 硬件及其他相关资料咨询龙邱淘宝客服.txt
+
+# Logs and runtime artifacts
+logs/archive/
+*.log
+*.tmp
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
 
 # Executables
 *.swf

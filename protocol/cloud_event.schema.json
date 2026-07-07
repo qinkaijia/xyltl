@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/safetyguardian/cloud_event.schema.json",
+  "title": "CloudEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "device_id",
+    "scene",
+    "timestamp",
+    "sensor_data",
+    "vision_result",
+    "local_rule_result"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "minLength": 1 },
+    "device_id": { "type": "string", "minLength": 1 },
+    "scene": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "sensor_data": { "$ref": "./sensor_packet.schema.json" },
+    "vision_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["person_detected", "helmet_detected", "fire_detected", "ppe_status"],
+      "properties": {
+        "person_detected": { "type": "boolean" },
+        "helmet_detected": { "type": "boolean" },
+        "fire_detected": { "type": "boolean" },
+        "ppe_status": { "type": "string" }
+      }
+    },
+    "local_rule_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["risk_level", "rule_hits", "local_actions"],
+      "properties": {
+        "risk_level": { "type": "string", "enum": ["L0", "L1", "L2", "L3"] },
+        "rule_hits": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "local_actions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}
