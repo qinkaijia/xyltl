@@ -25,9 +25,11 @@ void lq_gpio_output_demo(void)
     while (ls_system_running.load())
     {
         gpio.gpio_level_set(GPIO_HIGH);
-        usleep(5000);
+        printf("PIN_74 实测电平 = %d (设为HIGH)\n", gpio.gpio_level_get());
+        usleep(500 * 1000);
         gpio.gpio_level_set(GPIO_LOW);
-        usleep(5000);
+        printf("PIN_74 实测电平 = %d (设为LOW)\n", gpio.gpio_level_get());
+        usleep(500 * 1000);
     }
 }
 

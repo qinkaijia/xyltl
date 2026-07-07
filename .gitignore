@@ -3,9 +3,37 @@ bin-debug/
 bin-release/
 [Oo]bj/
 [Bb]in/
+build/
 
-# Other files and folders
+# IDE
 .settings/
+.vscode/
+
+# Compiled kernel modules
+*.ko
+
+# Precompiled static libs
+*.a
+
+# Tools (toolchain, dependency libs - too large for git)
+Loongson_2K300_301_LIB/tools/
+
+# SCP deploy scripts (contain board IP info)
+**/scp_send.sh
+**/scp_send_all.sh
+
+# Reports, docs, guides (personal notes)
+嵌赛报告最后模板.docx
+嵌赛报告_完整素材.md
+软件侧项目报告素材.md
+算法创新文档.md
+通信技术文档.agent.md
+编译与部署到板子指南.md
+常用嵌入式指令总结.md
+串口连接故障排查指南.md
+面包板接线指南_五传感器.md
+PCB设计_极简版.md
+硬件及其他相关资料咨询龙邱淘宝客服.txt
 
 # Executables
 *.swf
@@ -13,6 +41,6 @@ bin-release/
 *.ipa
 *.apk
 
-# Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
-# should NOT be excluded as they contain compiler settings and other important
-# information for Eclipse / Flash Builder.
+# Compressed archives
+*.tar.xz
+*.tar.gz

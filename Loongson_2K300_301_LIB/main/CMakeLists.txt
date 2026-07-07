@@ -63,15 +63,23 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/../libraries/drv/inc  # ncnn 头文件路径
     ${OPENCV_INCLUDE_DIRS}                      # OpenCV 头文件路径
     ${NCNN_INCLUDE_DIRS}                        # ncnn 头文件路径
+    ${PROJECT_SOURCE_DIR}/../tools/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/sysroot/include  # paho-mqtt 头文件路径
     # ${FFMPEG_INCLUDE_DIRS}  # ffmpeg 头文件路径
 )
 
 # 连接库
 target_link_libraries(${PROJECT_NAME} PUBLIC
     pthread
+    m
     lqncnn
     lq_camera_ex
+    paho-mqtt3c
     ${NCNN_LDFLAGS}
     ${OPENCV_LDFLAGS}
     # ${FFMPEG_LDFLAGS}
+)
+
+# 添加 paho-mqtt 静态库搜索路径
+target_link_directories(${PROJECT_NAME} PRIVATE
+    ${PROJECT_SOURCE_DIR}/../tools/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/sysroot/lib
 )

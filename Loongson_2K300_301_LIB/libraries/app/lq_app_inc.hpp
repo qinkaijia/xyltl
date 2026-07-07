@@ -14,4 +14,9 @@
 #include "lq_dht11.hpp"
 #include "lq_tracking.hpp"
 
+#include "lq_sht30.hpp"
+#include "lq_sgp30.hpp"
+
+#include "lq_mqtt.hpp"
+
 #endif
