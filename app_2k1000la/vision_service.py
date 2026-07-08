@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -25,9 +26,11 @@ from app_2k1000la.cloud_client import DEFAULT_BASE_URL, default_cache_file, reso
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "runtime" / "vision"
 DEFAULT_MODE_FILE = DEFAULT_OUTPUT_DIR / "mode_request.json"
 DEFAULT_CAPTURE_REQUEST_FILE = DEFAULT_OUTPUT_DIR / "capture_request.json"
+DEFAULT_LIVE_IMAGE_FILE = DEFAULT_OUTPUT_DIR / "live.jpg"
 DEFAULT_ARCHIVE_DIR = Path("/media/xylt/0403-0201/xylt_vision_archive")
 DEFAULT_PERIODIC_UPLOAD_SECONDS = 300.0
 DEFAULT_TRIGGER_MIN_INTERVAL_SECONDS = 30.0
+DEFAULT_PREVIEW_INTERVAL_SECONDS = 0.5
 DEFAULT_ARCHIVE_MAX_AGE_DAYS = 7.0
 DEFAULT_ARCHIVE_MAX_BYTES = 1_073_741_824
 DEFAULT_LOCAL_VISION_DIRS = [
@@ -195,39 +198,43 @@ class CameraSource:
         self.test_image = test_image
         self._cv2 = None
         self._capture = None
+        self._lock = threading.RLock()
 
     def open(self) -> None:
-        if self.test_image:
-            self._ensure_cv2()
-            return
-        if self._capture is not None:
-            return
-        cv2 = self._ensure_cv2()
-        capture = cv2.VideoCapture(self.camera_index)
-        if not capture.isOpened():
-            capture.release()
-            raise RuntimeError(f"无法打开 USB 摄像头 index={self.camera_index}")
-        capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        self._capture = capture
+        with self._lock:
+            if self.test_image:
+                self._ensure_cv2()
+                return
+            if self._capture is not None:
+                return
+            cv2 = self._ensure_cv2()
+            capture = cv2.VideoCapture(self.camera_index)
+            if not capture.isOpened():
+                capture.release()
+                raise RuntimeError(f"无法打开 USB 摄像头 index={self.camera_index}")
+            capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+            capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+            self._capture = capture
 
     def read(self) -> Any:
-        cv2 = self._ensure_cv2()
-        if self.test_image:
-            frame = cv2.imread(self.test_image)
-            if frame is None:
-                raise RuntimeError(f"无法读取测试图片: {self.test_image}")
+        with self._lock:
+            cv2 = self._ensure_cv2()
+            if self.test_image:
+                frame = cv2.imread(self.test_image)
+                if frame is None:
+                    raise RuntimeError(f"无法读取测试图片: {self.test_image}")
+                return frame
+            self.open()
+            ok, frame = self._capture.read()
+            if not ok or frame is None:
+                raise RuntimeError("摄像头读取失败")
             return frame
-        self.open()
-        ok, frame = self._capture.read()
-        if not ok or frame is None:
-            raise RuntimeError("摄像头读取失败")
-        return frame
 
     def release(self) -> None:
-        if self._capture is not None:
-            self._capture.release()
-            self._capture = None
+        with self._lock:
+            if self._capture is not None:
+                self._capture.release()
+                self._capture = None
 
     def _ensure_cv2(self) -> Any:
         if self._cv2 is not None:
@@ -246,6 +253,7 @@ class VisionLoop:
         self.base_url = base_url
         self.output_dir = Path(args.output_dir)
         self.image_path = self.output_dir / "latest.jpg"
+        self.live_image_path = Path(args.live_image_file)
         self.state_path = self.output_dir / "vision_state.json"
         self.mode_file = Path(args.mode_file)
         self.capture_request_file = Path(args.capture_request_file)
@@ -256,6 +264,8 @@ class VisionLoop:
         self.last_capture_monotonic = 0.0
         self.next_periodic_at = 0.0
         self.last_state: dict[str, Any] | None = None
+        self.last_preview_monotonic = 0.0
+        self.analysis_thread: threading.Thread | None = None
 
     def run_once(self, trigger: str = "manual", request_id: str = "", question: str = "") -> dict[str, Any]:
         started = time.time()
@@ -294,29 +304,55 @@ class VisionLoop:
             "vision_loop "
             f"periodic_upload_seconds={self.args.periodic_upload_seconds} "
             f"capture_request_file={self.capture_request_file} "
+            f"live_image_file={self.live_image_path} "
             f"archive_dir={self.archive_dir if not self.args.no_archive else 'disabled'}"
         )
         while True:
+            self.update_live_preview()
             state = self.maybe_run_due_capture()
             if state is not None:
                 print_state(state)
             time.sleep(max(0.2, self.args.interval))
 
+    def update_live_preview(self) -> None:
+        if self.args.preview_interval <= 0:
+            return
+        now = time.monotonic()
+        if now - self.last_preview_monotonic < self.args.preview_interval:
+            return
+        self.last_preview_monotonic = now
+
+        mode = self.current_mode()
+        if mode == "off":
+            self.camera.release()
+            return
+        try:
+            self.camera.open()
+            frame = self.camera.read()
+            encode_jpeg(frame, self.live_image_path, self.args.preview_jpeg_quality)
+        except Exception as exc:  # noqa: BLE001 - live preview must not kill the resident service.
+            if self.last_state is None:
+                state = error_status(mode, "camera", f"实时预览失败: {exc}")
+                self.write_state(state)
+
     def maybe_run_due_capture(self) -> dict[str, Any] | None:
         now = time.monotonic()
         request = read_capture_request(self.capture_request_file)
         if request and request["request_id"] != self.last_request_id:
+            if self.analysis_thread is not None and self.analysis_thread.is_alive():
+                return None
             force = bool(request.get("force"))
             can_capture = force or now - self.last_capture_monotonic >= self.args.trigger_min_interval_seconds
             self.last_request_id = str(request["request_id"])
             if can_capture:
-                state = self.run_once(
+                if not self.start_analysis(
                     trigger=str(request.get("trigger") or "manual"),
                     request_id=str(request.get("request_id") or ""),
                     question=str(request.get("question") or ""),
-                )
+                ):
+                    return None
                 self._mark_capture_done(now)
-                return state
+                return None
             if self.last_state is not None:
                 status = self.last_state.setdefault("vision_status", {})
                 status["reused_from_request_id"] = status.get("request_id", "")
@@ -329,11 +365,29 @@ class VisionLoop:
                 return self.last_state
 
         if self.args.periodic_upload_seconds > 0 and now >= self.next_periodic_at:
+            if self.analysis_thread is not None and self.analysis_thread.is_alive():
+                return None
             request_id = f"periodic-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-            state = self.run_once(trigger="periodic", request_id=request_id)
+            if not self.start_analysis(trigger="periodic", request_id=request_id):
+                return None
             self._mark_capture_done(now)
-            return state
+            return None
         return None
+
+    def start_analysis(self, trigger: str, request_id: str, question: str = "") -> bool:
+        if self.analysis_thread is not None and self.analysis_thread.is_alive():
+            return False
+        self.analysis_thread = threading.Thread(
+            target=self._analysis_worker,
+            args=(trigger, request_id, question),
+            daemon=True,
+        )
+        self.analysis_thread.start()
+        return True
+
+    def _analysis_worker(self, trigger: str, request_id: str, question: str) -> None:
+        state = self.run_once(trigger=trigger, request_id=request_id, question=question)
+        print_state(state)
 
     def _mark_capture_done(self, now: float) -> None:
         self.last_capture_monotonic = now
@@ -384,6 +438,7 @@ class VisionLoop:
     def write_state(self, state: dict[str, Any]) -> None:
         status = state.setdefault("vision_status", {})
         status.setdefault("image_path", str(self.image_path if self.image_path.exists() else ""))
+        status["live_image_path"] = str(self.live_image_path if self.live_image_path.exists() else "")
         if not self.args.no_archive:
             status.update(
                 archive_capture(
@@ -624,6 +679,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--local-vision-dir", default="")
     parser.add_argument("--sensor-snapshot-file", default=str(REPO_ROOT / "runtime" / "latest_evaluate_response.json"))
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
+    parser.add_argument("--live-image-file", default=str(DEFAULT_LIVE_IMAGE_FILE))
     parser.add_argument("--capture-request-file", default=str(DEFAULT_CAPTURE_REQUEST_FILE))
     parser.add_argument("--archive-dir", default=str(DEFAULT_ARCHIVE_DIR))
     parser.add_argument("--archive-max-age-days", type=float, default=DEFAULT_ARCHIVE_MAX_AGE_DAYS)
@@ -631,6 +687,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-archive", action="store_true")
     parser.add_argument("--periodic-upload-seconds", type=float, default=DEFAULT_PERIODIC_UPLOAD_SECONDS)
     parser.add_argument("--trigger-min-interval-seconds", type=float, default=DEFAULT_TRIGGER_MIN_INTERVAL_SECONDS)
+    parser.add_argument("--preview-interval", type=float, default=DEFAULT_PREVIEW_INTERVAL_SECONDS)
+    parser.add_argument("--preview-jpeg-quality", type=int, default=55)
     parser.add_argument("--interval", type=float, default=1.0, help="Loop polling interval in seconds.")
     parser.add_argument("--loop", action="store_true")
     parser.add_argument("--include-debug", action="store_true")

@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QDateTime>
 
 #include "SystemStatus.h"
 
@@ -31,6 +32,7 @@ private slots:
     void setVisionModeCloud();
     void setVisionModeLocal();
     void setVisionModeOff();
+    void requestVisionCapture();
 
 private:
     QWidget *buildCentral();
@@ -49,6 +51,7 @@ private:
     void stopVoiceAssistant();
     void setVoiceButtonRunning(bool running);
     void writeVisionModeRequest(const QString &mode);
+    void updateVisionImage(const SystemStatus &status);
 
     StatusModel *m_model = nullptr;
     bool m_compactMode = false;
@@ -80,6 +83,7 @@ private:
     QPushButton *m_visionCloudButton = nullptr;
     QPushButton *m_visionLocalButton = nullptr;
     QPushButton *m_visionOffButton = nullptr;
+    QPushButton *m_visionCaptureButton = nullptr;
     QLabel *m_voiceAssistantLabel = nullptr;
     QLabel *m_voiceStatusLabel = nullptr;
     QLabel *m_voiceQuestionLabel = nullptr;
@@ -94,6 +98,8 @@ private:
     QTimer *m_voiceAnimationTimer = nullptr;
     int m_voiceAnimationFrame = 0;
     int m_lastVoiceState = VOICE_IDLE;
+    QDateTime m_lastVisionTimestamp;
+    QDateTime m_showVisionKeyframeUntil;
 };
 
 #endif // MAINWINDOW_H

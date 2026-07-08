@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QDir>
 #include <QStringList>
 #include <QTimer>
 
@@ -246,9 +247,17 @@ FinalStatusDataProvider::FinalStatusDataProvider(
     const QString &statusFile,
     const QString &voiceFile,
     const QString &visionFile,
+    const QString &visionLiveFile,
     QObject *parent)
-    : IDataProvider(parent), m_statusFile(statusFile), m_voiceFile(voiceFile), m_visionFile(visionFile)
+    : IDataProvider(parent),
+      m_statusFile(statusFile),
+      m_voiceFile(voiceFile),
+      m_visionFile(visionFile),
+      m_visionLiveFile(visionLiveFile)
 {
+    if (m_visionLiveFile.isEmpty() && !m_visionFile.isEmpty()) {
+        m_visionLiveFile = QFileInfo(m_visionFile).dir().filePath(QStringLiteral("live.jpg"));
+    }
     m_timer = new QTimer(this);
     m_timer->setInterval(kPollIntervalMs);
     connect(m_timer, &QTimer::timeout, this, &FinalStatusDataProvider::poll);
@@ -285,7 +294,12 @@ void FinalStatusDataProvider::poll()
         && visionInfo.exists()
         && visionInfo.isFile()
         && visionInfo.lastModified() != m_lastVisionModified;
-    if (info.lastModified() == m_lastModified && !voiceChanged && !visionChanged) {
+    QFileInfo visionLiveInfo(m_visionLiveFile);
+    const bool visionLiveChanged = !m_visionLiveFile.isEmpty()
+        && visionLiveInfo.exists()
+        && visionLiveInfo.isFile()
+        && visionLiveInfo.lastModified() != m_lastVisionLiveModified;
+    if (info.lastModified() == m_lastModified && !voiceChanged && !visionChanged && !visionLiveChanged) {
         return;
     }
 
@@ -297,6 +311,9 @@ void FinalStatusDataProvider::poll()
         }
         if (visionInfo.exists() && visionInfo.isFile()) {
             m_lastVisionModified = visionInfo.lastModified();
+        }
+        if (visionLiveInfo.exists() && visionLiveInfo.isFile()) {
+            m_lastVisionLiveModified = visionLiveInfo.lastModified();
         }
         emit statusUpdated(status);
     }
@@ -430,6 +447,7 @@ void FinalStatusDataProvider::loadVisionStatus(SystemStatus *status)
     status->visionSummary = obj.value(QStringLiteral("summary")).toString();
     status->visionMissingPpe = textArray(obj.value(QStringLiteral("missing_ppe")));
     status->visionImagePath = obj.value(QStringLiteral("image_path")).toString();
+    status->visionLiveImagePath = obj.value(QStringLiteral("live_image_path")).toString(m_visionLiveFile);
     status->visionError = obj.value(QStringLiteral("error")).toString();
     status->visionCameraOnline = obj.value(QStringLiteral("camera_online")).toBool(false);
     status->visionPersonDetected = obj.value(QStringLiteral("person_detected")).toBool(false);
@@ -438,6 +456,10 @@ void FinalStatusDataProvider::loadVisionStatus(SystemStatus *status)
     status->visionMaskState = optionalBoolState(obj.value(QStringLiteral("mask_detected")));
     status->visionVestState = optionalBoolState(obj.value(QStringLiteral("reflective_vest_detected")));
     status->visionLatencyMs = obj.value(QStringLiteral("latency_ms")).toInt(-1);
+    status->visionTimestamp = QDateTime::fromString(obj.value(QStringLiteral("timestamp")).toString(), Qt::ISODate);
+    if (!status->visionTimestamp.isValid()) {
+        status->visionTimestamp = QDateTime::fromString(obj.value(QStringLiteral("timestamp")).toString(), QStringLiteral("yyyy-MM-ddTHH:mm:ss"));
+    }
 }
 
 int FinalStatusDataProvider::voiceStateFromText(const QString &state)

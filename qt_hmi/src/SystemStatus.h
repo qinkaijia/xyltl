@@ -61,6 +61,7 @@ struct SystemStatus {
     QString visionSummary;
     QString visionMissingPpe;
     QString visionImagePath;
+    QString visionLiveImagePath;
     QString visionError;
     bool visionCameraOnline = false;
     bool visionPersonDetected = false;
@@ -69,6 +70,7 @@ struct SystemStatus {
     int visionMaskState = -1;
     int visionVestState = -1;
     int visionLatencyMs = -1;
+    QDateTime visionTimestamp;
     QString analysisMode;
     QString sensorSource;
     QString modelSource;

@@ -16,6 +16,7 @@ public:
         const QString &statusFile,
         const QString &voiceFile = QString(),
         const QString &visionFile = QString(),
+        const QString &visionLiveFile = QString(),
         QObject *parent = nullptr);
     ~FinalStatusDataProvider() override;
 
@@ -35,10 +36,12 @@ private:
     QString m_statusFile;
     QString m_voiceFile;
     QString m_visionFile;
+    QString m_visionLiveFile;
     QTimer *m_timer = nullptr;
     QDateTime m_lastModified;
     QDateTime m_lastVoiceModified;
     QDateTime m_lastVisionModified;
+    QDateTime m_lastVisionLiveModified;
 };
 
 #endif // FINALSTATUSDATAPROVIDER_H

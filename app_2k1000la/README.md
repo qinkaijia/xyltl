@@ -226,19 +226,23 @@ python3 app_2k1000la/vision_service.py \
   --camera-index 0 \
   --mode cloud \
   --output-dir runtime/vision \
+  --live-image-file runtime/vision/live.jpg \
   --periodic-upload-seconds 300 \
   --capture-request-file runtime/vision/capture_request.json \
   --archive-dir /media/xylt/0403-0201/xylt_vision_archive \
+  --preview-interval 0.5 \
   --loop \
-  --interval 1 \
+  --interval 0.5 \
   --include-debug
 ```
 
 说明：
 
 - `--periodic-upload-seconds 300`：默认每 5 分钟抓拍上传一次，避免持续消耗 token。
+- `--live-image-file runtime/vision/live.jpg`：持续写入实时预览帧，Qt HMI 默认显示该画面。
 - `runtime/vision/capture_request.json`：语音助手按需抓拍入口，写入后服务会立即拍照分析。
 - 30 秒内重复视觉问题默认复用最近结果；请求中 `force=true` 可强制重拍。
+- Qt HMI 的“拍照检测”按钮会写入 `trigger=qt_manual`、`force=true` 的请求；检测完成后短暂显示 `latest.jpg`，随后恢复 `live.jpg`。
 - `--archive-dir`：将 JPEG 和对应 `vision_state` 归档到 SD 卡，默认清理策略为 7 天且总量不超过 1GB。
 
 联动网页模式切换：

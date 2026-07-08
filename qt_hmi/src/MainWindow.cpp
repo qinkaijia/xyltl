@@ -483,14 +483,14 @@ QWidget *MainWindow::createCameraPage()
     QVBoxLayout *imageLayout = new QVBoxLayout(imagePanel);
     imageLayout->setContentsMargins(m_compactMode ? 8 : 12, m_compactMode ? 8 : 12,
                                     m_compactMode ? 8 : 12, m_compactMode ? 8 : 12);
-    QLabel *imageTitle = new QLabel(QStringLiteral("USB 摄像头关键帧"));
+    QLabel *imageTitle = new QLabel(QStringLiteral("USB 摄像头实时画面 / 检测关键帧"));
     imageTitle->setStyleSheet(
         QStringLiteral("color:%1; font-size:%2px; font-weight:800; background:transparent;")
             .arg(kMutedColor)
             .arg(m_compactMode ? 13 : 18));
     imageLayout->addWidget(imageTitle);
 
-    m_visionImageLabel = new QLabel(QStringLiteral("等待关键帧"));
+    m_visionImageLabel = new QLabel(QStringLiteral("等待摄像头画面"));
     m_visionImageLabel->setMinimumSize(m_compactMode ? QSize(300, 190) : QSize(520, 320));
     m_visionImageLabel->setAlignment(Qt::AlignCenter);
     m_visionImageLabel->setScaledContents(false);
@@ -535,6 +535,17 @@ QWidget *MainWindow::createCameraPage()
                 .arg(kTextColor));
         statusLayout->addWidget(label);
     }
+
+    m_visionCaptureButton = new QPushButton(QStringLiteral("拍照检测"));
+    m_visionCaptureButton->setMinimumHeight(m_compactMode ? 34 : 42);
+    m_visionCaptureButton->setStyleSheet(
+        QStringLiteral("QPushButton{background:%1; color:white; border:1px solid %1; "
+                       "border-radius:6px; padding:5px 12px; font-size:%2px; font-weight:900;}"
+                       "QPushButton:pressed{background:#185d66;}")
+            .arg(kAccentColor)
+            .arg(m_compactMode ? 14 : 18));
+    connect(m_visionCaptureButton, &QPushButton::clicked, this, &MainWindow::requestVisionCapture);
+    statusLayout->addWidget(m_visionCaptureButton);
 
     QHBoxLayout *buttons = new QHBoxLayout;
     m_visionCloudButton = new QPushButton(QStringLiteral("云端"));
@@ -844,19 +855,7 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
                 .arg(suggestion));
     }
 
-    if (m_visionImageLabel) {
-        QPixmap image;
-        if (!s.visionImagePath.isEmpty()) {
-            image.load(s.visionImagePath);
-        }
-        if (!image.isNull()) {
-            m_visionImageLabel->setPixmap(
-                image.scaled(m_visionImageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-        } else {
-            m_visionImageLabel->setPixmap(QPixmap());
-            m_visionImageLabel->setText(QStringLiteral("等待关键帧"));
-        }
-    }
+    updateVisionImage(s);
     if (m_visionStatusLabel) {
         const int visionLevel = ppeStatusLevel(s.visionStatus);
         const char *color = levelColor(visionLevel);
@@ -958,6 +957,41 @@ void MainWindow::updateVoiceAnimation()
     ++m_voiceAnimationFrame;
 }
 
+void MainWindow::updateVisionImage(const SystemStatus &s)
+{
+    if (!m_visionImageLabel) {
+        return;
+    }
+
+    const QDateTime now = QDateTime::currentDateTime();
+    if (s.visionTimestamp.isValid() && s.visionTimestamp != m_lastVisionTimestamp) {
+        m_lastVisionTimestamp = s.visionTimestamp;
+        m_showVisionKeyframeUntil = now.addSecs(8);
+    }
+
+    const bool preferKeyframe = m_showVisionKeyframeUntil.isValid()
+        && now < m_showVisionKeyframeUntil
+        && !s.visionImagePath.isEmpty();
+    QString imagePath = preferKeyframe ? s.visionImagePath : s.visionLiveImagePath;
+    if (imagePath.isEmpty() && !s.visionImagePath.isEmpty()) {
+        imagePath = s.visionImagePath;
+    }
+
+    QPixmap image;
+    if (!imagePath.isEmpty()) {
+        image.load(imagePath);
+    }
+    if (!image.isNull()) {
+        m_visionImageLabel->setText(QString());
+        m_visionImageLabel->setPixmap(
+            image.scaled(m_visionImageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        return;
+    }
+
+    m_visionImageLabel->setPixmap(QPixmap());
+    m_visionImageLabel->setText(preferKeyframe ? QStringLiteral("等待检测关键帧") : QStringLiteral("等待实时画面"));
+}
+
 void MainWindow::showModelDetails()
 {
     QDialog dialog(this);
@@ -1052,6 +1086,46 @@ void MainWindow::writeVisionModeRequest(const QString &mode)
     file.write("\n");
     if (m_visionModeLabel) {
         m_visionModeLabel->setText(QStringLiteral("模式：%1\n请求已写入，等待视觉服务切换").arg(mode));
+    }
+}
+
+void MainWindow::requestVisionCapture()
+{
+    const QString root = repoRootPath();
+    QDir runtimeDir(QDir(root).filePath(QStringLiteral("runtime/vision")));
+    if (!runtimeDir.exists()) {
+        runtimeDir.mkpath(QStringLiteral("."));
+    }
+
+    const QString requestId = QStringLiteral("qt-%1").arg(QDateTime::currentMSecsSinceEpoch());
+    QJsonObject payload;
+    payload.insert(QStringLiteral("type"), QStringLiteral("vision_capture_request"));
+    payload.insert(QStringLiteral("request_id"), requestId);
+    payload.insert(QStringLiteral("trigger"), QStringLiteral("qt_manual"));
+    payload.insert(QStringLiteral("question"), QStringLiteral("Qt 手动拍照检测"));
+    payload.insert(QStringLiteral("force"), true);
+    payload.insert(QStringLiteral("created_at"), QDateTime::currentDateTime().toString(Qt::ISODate));
+
+    QFile file(runtimeDir.filePath(QStringLiteral("capture_request.json")));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        if (m_visionSummaryLabel) {
+            m_visionSummaryLabel->setText(QStringLiteral("错误：无法写入拍照检测请求文件"));
+        }
+        return;
+    }
+    file.write(QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    file.write("\n");
+
+    if (m_visionCaptureButton) {
+        m_visionCaptureButton->setText(QStringLiteral("检测中..."));
+        QTimer::singleShot(2500, this, [this]() {
+            if (m_visionCaptureButton) {
+                m_visionCaptureButton->setText(QStringLiteral("拍照检测"));
+            }
+        });
+    }
+    if (m_visionSummaryLabel) {
+        m_visionSummaryLabel->setText(QStringLiteral("结论：已请求拍照检测，等待视觉服务返回结果。"));
     }
 }
 

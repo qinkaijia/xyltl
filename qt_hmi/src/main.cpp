@@ -1,4 +1,6 @@
 #include <QApplication>
+#include <QFileInfo>
+#include <QDir>
 #include <QRect>
 #include <QRegExp>
 #include <QScreen>
@@ -59,10 +61,14 @@ int main(int argc, char *argv[])
     const QString statusFile = argumentValue(args, QStringLiteral("--status-file"));
     const QString voiceFile = argumentValue(args, QStringLiteral("--voice-file"));
     const QString visionFile = argumentValue(args, QStringLiteral("--vision-file"));
+    QString visionLiveFile = argumentValue(args, QStringLiteral("--vision-live-file"));
+    if (visionLiveFile.isEmpty() && !visionFile.isEmpty()) {
+        visionLiveFile = QFileInfo(visionFile).dir().filePath(QStringLiteral("live.jpg"));
+    }
     const bool compactMode = args.contains(QStringLiteral("--compact"));
 
     MockDataProvider mockProvider;
-    FinalStatusDataProvider finalStatusProvider(statusFile, voiceFile, visionFile);
+    FinalStatusDataProvider finalStatusProvider(statusFile, voiceFile, visionFile, visionLiveFile);
     IDataProvider *provider = statusFile.isEmpty()
         ? static_cast<IDataProvider *>(&mockProvider)
         : static_cast<IDataProvider *>(&finalStatusProvider);
