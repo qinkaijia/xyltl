@@ -2,6 +2,8 @@
 
 本文记录 2K1000LA 与 2K0301/301 的 systemd 自启动编排。原则是每个功能只保留一个常驻实例，避免多个采集程序同时向同一 MQTT topic 发布数据。
 
+完整系统启动顺序、网页入口、语音/视觉/301 排障步骤见 [`FULL_SYSTEM_STARTUP_RUNBOOK.md`](FULL_SYSTEM_STARTUP_RUNBOOK.md)。
+
 ## 2K1000LA
 
 已部署服务：
