@@ -142,6 +142,69 @@
 
 安全约束：LLM 和 JudgeModel 不允许降低 RuleEngine 判定出的报警等级。
 
+## 视觉评估接口
+
+### 上传摄像头关键帧并评估 PPE
+
+- 方法：`POST`
+- URL：`/api/vision/evaluate`
+- 作用：接收 2K1000LA USB 摄像头 JPEG 关键帧，云端模式下调用豆包视觉模型，返回人员、安全帽、口罩、反光背心、火焰等安全评估结果。
+
+请求：
+
+```json
+{
+  "device_id": "board_2k1000la",
+  "timestamp": "2026-07-08T12:00:00+08:00",
+  "image_base64": "...",
+  "image_mime": "image/jpeg",
+  "mode": "cloud",
+  "sensor_snapshot": {
+    "temperature": 25.0,
+    "humidity": 55.0,
+    "tvoc": 120,
+    "eco2": 450,
+    "mq3_value": 0.123,
+    "flame_detected": false,
+    "risk_score": 0
+  },
+  "include_debug": true
+}
+```
+
+返回：
+
+```json
+{
+  "vision_status": {
+    "device_id": "board_2k1000la",
+    "mode": "cloud",
+    "backend": "doubao_vision",
+    "camera_online": true,
+    "person_detected": true,
+    "helmet_detected": true,
+    "mask_detected": false,
+    "reflective_vest_detected": true,
+    "fire_detected": false,
+    "ppe_status": "fail",
+    "missing_ppe": ["口罩"],
+    "summary": "检测到人员未佩戴口罩。",
+    "latency_ms": 1200,
+    "image_available": true
+  },
+  "debug": null
+}
+```
+
+### 查询最近视觉结果和模式
+
+- `GET /api/vision/latest`
+- `GET /api/vision/latest-image`
+- `GET /api/vision/mode`
+- `POST /api/vision/mode`，请求体：`{"mode":"cloud"}`，可选值为 `cloud/local/off`。
+
+约束：`local` YOLO 推理在 2K1000LA 板端运行，SafeCloud 只负责保存模式请求和云端视觉评估；云端和本地视觉推理不应同时运行。
+
 ## 报警接口
 
 - `GET /api/alarms`

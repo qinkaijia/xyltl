@@ -28,6 +28,9 @@ private slots:
     void onVoiceProcessFinished(int exitCode, int exitStatus);
     void onVoiceProcessError();
     void updateVoiceAnimation();
+    void setVisionModeCloud();
+    void setVisionModeLocal();
+    void setVisionModeOff();
 
 private:
     QWidget *buildCentral();
@@ -35,6 +38,7 @@ private:
     QWidget *createMetricsPage();
     QWidget *createMetricPage(const QString &title, const QString &unit, QLabel **valueLabelOut, QLabel **detailLabelOut);
     QWidget *createAnalysisPage();
+    QWidget *createCameraPage();
     QWidget *createLogPage();
     QWidget *createVoicePage();
     QFrame *createCard(const QString &title, QLabel **valueLabelOut);
@@ -44,6 +48,7 @@ private:
     bool startVoiceAssistant();
     void stopVoiceAssistant();
     void setVoiceButtonRunning(bool running);
+    void writeVisionModeRequest(const QString &mode);
 
     StatusModel *m_model = nullptr;
     bool m_compactMode = false;
@@ -66,6 +71,15 @@ private:
     QFrame *m_cloudCard = nullptr; QLabel *m_cloudValue = nullptr;
 
     QLabel *m_infoLabel = nullptr;
+    QLabel *m_visionImageLabel = nullptr;
+    QLabel *m_visionModeLabel = nullptr;
+    QLabel *m_visionStatusLabel = nullptr;
+    QLabel *m_visionSummaryLabel = nullptr;
+    QLabel *m_visionPpeLabel = nullptr;
+    QLabel *m_visionBackendLabel = nullptr;
+    QPushButton *m_visionCloudButton = nullptr;
+    QPushButton *m_visionLocalButton = nullptr;
+    QPushButton *m_visionOffButton = nullptr;
     QLabel *m_voiceAssistantLabel = nullptr;
     QLabel *m_voiceStatusLabel = nullptr;
     QLabel *m_voiceQuestionLabel = nullptr;

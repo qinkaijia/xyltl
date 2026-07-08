@@ -53,6 +53,10 @@
             <strong>AI 评估</strong>
             <span>Multi-LLM</span>
           </button>
+          <button class="page-tab" type="button" data-page-tab="vision" aria-selected="false">
+            <strong>视觉巡检</strong>
+            <span>Vision</span>
+          </button>
           <button class="page-tab" type="button" data-page-tab="operations" aria-selected="false">
             <strong>告警控制</strong>
             <span>Operations</span>
@@ -209,6 +213,69 @@
             </div>
             <div id="evaluateResult" class="evaluate-result empty-state">暂无评估结果</div>
           </article>
+        </section>
+
+        <section class="page-view" data-page-view="vision" aria-label="视觉巡检">
+          <section class="vision-grid">
+            <article class="panel vision-image-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Camera Vision</p>
+                  <h2>USB 摄像头关键帧</h2>
+                </div>
+                <span id="visionModeText" class="muted">等待视觉服务</span>
+              </div>
+              <div class="vision-frame">
+                <img id="visionImage" class="vision-image" alt="摄像头关键帧" />
+                <div id="visionImageEmpty" class="vision-empty">暂无关键帧</div>
+              </div>
+            </article>
+
+            <article class="panel vision-status-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">PPE Safety</p>
+                  <h2>人员安全评估</h2>
+                </div>
+                <span id="visionStatusPill" class="pill warning">等待识别</span>
+              </div>
+              <div class="vision-status-grid">
+                <div class="vision-status-card">
+                  <span>人员</span>
+                  <strong id="visionPerson">--</strong>
+                </div>
+                <div class="vision-status-card">
+                  <span>安全帽</span>
+                  <strong id="visionHelmet">--</strong>
+                </div>
+                <div class="vision-status-card">
+                  <span>口罩</span>
+                  <strong id="visionMask">--</strong>
+                </div>
+                <div class="vision-status-card">
+                  <span>反光背心</span>
+                  <strong id="visionVest">--</strong>
+                </div>
+              </div>
+              <div class="status-line">
+                <span>结论</span>
+                <p id="visionSummary">等待视觉模块启动</p>
+              </div>
+              <div class="status-line">
+                <span>缺失</span>
+                <p id="visionMissing">--</p>
+              </div>
+              <div class="status-line">
+                <span>后端</span>
+                <p id="visionBackend">--</p>
+              </div>
+              <div class="vision-mode-controls" aria-label="视觉模式切换">
+                <button class="text-button" type="button" data-vision-mode="cloud">云端豆包</button>
+                <button class="text-button" type="button" data-vision-mode="local">本地 YOLO</button>
+                <button class="text-button" type="button" data-vision-mode="off">关闭视觉</button>
+              </div>
+            </article>
+          </section>
         </section>
 
         <section class="page-view" data-page-view="operations" aria-label="告警控制">

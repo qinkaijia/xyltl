@@ -2,19 +2,26 @@
 #include "StatusModel.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QIODevice>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
+#include <QList>
 #include <QListWidget>
+#include <QPixmap>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QPushButton>
+#include <QSize>
 #include <QTabWidget>
 #include <QTextEdit>
 #include <QTimer>
@@ -82,6 +89,42 @@ static QString humidityText(double value)
 static QString onlineText(bool online)
 {
     return online ? QStringLiteral("在线") : QStringLiteral("离线");
+}
+
+static QString optionalStateText(int state)
+{
+    if (state > 0) {
+        return QStringLiteral("已佩戴");
+    }
+    if (state == 0) {
+        return QStringLiteral("未佩戴");
+    }
+    return QStringLiteral("未确认");
+}
+
+static QString ppeStatusText(const QString &status)
+{
+    if (status == QStringLiteral("pass")) {
+        return QStringLiteral("防护合规");
+    }
+    if (status == QStringLiteral("fail")) {
+        return QStringLiteral("防护缺失");
+    }
+    if (status == QStringLiteral("error")) {
+        return QStringLiteral("视觉异常");
+    }
+    return QStringLiteral("等待识别");
+}
+
+static int ppeStatusLevel(const QString &status)
+{
+    if (status == QStringLiteral("fail") || status == QStringLiteral("error")) {
+        return LEVEL_ALARM;
+    }
+    if (status == QStringLiteral("unknown")) {
+        return LEVEL_WARNING;
+    }
+    return LEVEL_NORMAL;
 }
 
 static QString timestampText(const QDateTime &time)
@@ -242,6 +285,7 @@ QWidget *MainWindow::buildCentral()
     m_tabs->addTab(createOverviewPage(), QStringLiteral("总览"));
     m_tabs->addTab(createMetricsPage(), QStringLiteral("环境监测"));
     m_tabs->addTab(createAnalysisPage(), QStringLiteral("AI分析"));
+    m_tabs->addTab(createCameraPage(), QStringLiteral("视觉"));
     m_tabs->addTab(createLogPage(), QStringLiteral("日志"));
     m_tabs->addTab(createVoicePage(), QStringLiteral("语音"));
     m_tabs->setCurrentIndex(1);
@@ -422,6 +466,99 @@ QWidget *MainWindow::createAnalysisPage()
             .arg(m_compactMode ? 15 : 21)
             .arg(kTextColor));
     layout->addWidget(m_infoLabel, 1);
+    return page;
+}
+
+QWidget *MainWindow::createCameraPage()
+{
+    QWidget *page = new QWidget;
+    QHBoxLayout *layout = new QHBoxLayout(page);
+    layout->setContentsMargins(m_compactMode ? 10 : 18, m_compactMode ? 8 : 14,
+                               m_compactMode ? 10 : 18, m_compactMode ? 8 : 14);
+    layout->setSpacing(m_compactMode ? 8 : 14);
+
+    QFrame *imagePanel = new QFrame;
+    imagePanel->setStyleSheet(
+        QStringLiteral("QFrame{background:%1; border:1px solid %2; border-radius:8px;}").arg(kCardColor).arg(kLineColor));
+    QVBoxLayout *imageLayout = new QVBoxLayout(imagePanel);
+    imageLayout->setContentsMargins(m_compactMode ? 8 : 12, m_compactMode ? 8 : 12,
+                                    m_compactMode ? 8 : 12, m_compactMode ? 8 : 12);
+    QLabel *imageTitle = new QLabel(QStringLiteral("USB 摄像头关键帧"));
+    imageTitle->setStyleSheet(
+        QStringLiteral("color:%1; font-size:%2px; font-weight:800; background:transparent;")
+            .arg(kMutedColor)
+            .arg(m_compactMode ? 13 : 18));
+    imageLayout->addWidget(imageTitle);
+
+    m_visionImageLabel = new QLabel(QStringLiteral("等待关键帧"));
+    m_visionImageLabel->setMinimumSize(m_compactMode ? QSize(300, 190) : QSize(520, 320));
+    m_visionImageLabel->setAlignment(Qt::AlignCenter);
+    m_visionImageLabel->setScaledContents(false);
+    m_visionImageLabel->setStyleSheet(
+        QStringLiteral("QLabel{background:#111b18; color:#d9e2dc; border-radius:8px; "
+                       "font-size:%1px; font-weight:700;}").arg(m_compactMode ? 14 : 18));
+    imageLayout->addWidget(m_visionImageLabel, 1);
+
+    QFrame *statusPanel = new QFrame;
+    statusPanel->setMinimumWidth(m_compactMode ? 220 : 320);
+    statusPanel->setStyleSheet(
+        QStringLiteral("QFrame{background:%1; border:1px solid %2; border-radius:8px;}").arg(kPanelColor).arg(kLineColor));
+    QVBoxLayout *statusLayout = new QVBoxLayout(statusPanel);
+    statusLayout->setContentsMargins(m_compactMode ? 10 : 16, m_compactMode ? 8 : 14,
+                                     m_compactMode ? 10 : 16, m_compactMode ? 8 : 14);
+    statusLayout->setSpacing(m_compactMode ? 6 : 10);
+
+    m_visionStatusLabel = new QLabel(QStringLiteral("视觉状态：等待识别"));
+    m_visionStatusLabel->setWordWrap(true);
+    m_visionStatusLabel->setAlignment(Qt::AlignCenter);
+    m_visionStatusLabel->setStyleSheet(
+        QStringLiteral("QLabel{background:white; border:2px solid %1; border-radius:8px; "
+                       "padding:%2px; font-size:%3px; font-weight:900; color:%1;}")
+            .arg(kWarningColor)
+            .arg(m_compactMode ? 8 : 12)
+            .arg(m_compactMode ? 17 : 24));
+    statusLayout->addWidget(m_visionStatusLabel);
+
+    m_visionModeLabel = new QLabel(QStringLiteral("模式：--"));
+    m_visionBackendLabel = new QLabel(QStringLiteral("后端：--"));
+    m_visionPpeLabel = new QLabel(QStringLiteral("人员：--\n安全帽：--  口罩：--  反光背心：--"));
+    m_visionSummaryLabel = new QLabel(QStringLiteral("结论：等待视觉模块启动"));
+    QList<QLabel *> labels = {m_visionModeLabel, m_visionBackendLabel, m_visionPpeLabel, m_visionSummaryLabel};
+    for (QLabel *label : labels) {
+        label->setWordWrap(true);
+        label->setStyleSheet(
+            QStringLiteral("QLabel{background:white; border:1px solid %1; border-radius:8px; "
+                           "padding:%2px; font-size:%3px; color:%4;}")
+                .arg(kLineColor)
+                .arg(m_compactMode ? 7 : 10)
+                .arg(m_compactMode ? 13 : 18)
+                .arg(kTextColor));
+        statusLayout->addWidget(label);
+    }
+
+    QHBoxLayout *buttons = new QHBoxLayout;
+    m_visionCloudButton = new QPushButton(QStringLiteral("云端"));
+    m_visionLocalButton = new QPushButton(QStringLiteral("本地"));
+    m_visionOffButton = new QPushButton(QStringLiteral("关闭"));
+    QList<QPushButton *> modeButtons = {m_visionCloudButton, m_visionLocalButton, m_visionOffButton};
+    for (QPushButton *button : modeButtons) {
+        button->setMinimumHeight(m_compactMode ? 32 : 40);
+        button->setStyleSheet(
+            QStringLiteral("QPushButton{background:#ffffff; color:%1; border:1px solid %2; "
+                           "border-radius:6px; padding:4px 10px; font-size:%3px; font-weight:800;}")
+                .arg(kAccentColor)
+                .arg(kLineColor)
+                .arg(m_compactMode ? 13 : 17));
+        buttons->addWidget(button);
+    }
+    connect(m_visionCloudButton, &QPushButton::clicked, this, &MainWindow::setVisionModeCloud);
+    connect(m_visionLocalButton, &QPushButton::clicked, this, &MainWindow::setVisionModeLocal);
+    connect(m_visionOffButton, &QPushButton::clicked, this, &MainWindow::setVisionModeOff);
+    statusLayout->addLayout(buttons);
+    statusLayout->addStretch();
+
+    layout->addWidget(imagePanel, 3);
+    layout->addWidget(statusPanel, 2);
     return page;
 }
 
@@ -707,6 +844,63 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
                 .arg(suggestion));
     }
 
+    if (m_visionImageLabel) {
+        QPixmap image;
+        if (!s.visionImagePath.isEmpty()) {
+            image.load(s.visionImagePath);
+        }
+        if (!image.isNull()) {
+            m_visionImageLabel->setPixmap(
+                image.scaled(m_visionImageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        } else {
+            m_visionImageLabel->setPixmap(QPixmap());
+            m_visionImageLabel->setText(QStringLiteral("等待关键帧"));
+        }
+    }
+    if (m_visionStatusLabel) {
+        const int visionLevel = ppeStatusLevel(s.visionStatus);
+        const char *color = levelColor(visionLevel);
+        m_visionStatusLabel->setText(QStringLiteral("视觉状态：%1").arg(ppeStatusText(s.visionStatus)));
+        m_visionStatusLabel->setStyleSheet(
+            QStringLiteral("QLabel{background:white; border:2px solid %1; border-radius:8px; "
+                           "padding:%2px; font-size:%3px; font-weight:900; color:%1;}")
+                .arg(color)
+                .arg(m_compactMode ? 8 : 12)
+                .arg(m_compactMode ? 17 : 24));
+    }
+    if (m_visionModeLabel) {
+        const QString visionMode = s.visionMode.isEmpty() ? QStringLiteral("--") : s.visionMode;
+        const QString latencyText = s.visionLatencyMs >= 0 ? QStringLiteral("%1 ms").arg(s.visionLatencyMs) : QStringLiteral("--");
+        m_visionModeLabel->setText(
+            QStringLiteral("模式：%1\n摄像头：%2  延迟：%3")
+                .arg(visionMode)
+                .arg(s.visionCameraOnline ? QStringLiteral("在线") : QStringLiteral("离线"))
+                .arg(latencyText));
+    }
+    if (m_visionBackendLabel) {
+        m_visionBackendLabel->setText(
+            QStringLiteral("后端：%1\n火焰：%2")
+                .arg(s.visionBackend.isEmpty() ? QStringLiteral("--") : s.visionBackend)
+                .arg(s.visionFireDetected ? QStringLiteral("疑似存在") : QStringLiteral("未检测到")));
+    }
+    if (m_visionPpeLabel) {
+        m_visionPpeLabel->setText(
+            QStringLiteral("人员：%1\n安全帽：%2  口罩：%3  反光背心：%4\n缺失：%5")
+                .arg(s.visionPersonDetected ? QStringLiteral("检测到") : QStringLiteral("未检测到"))
+                .arg(optionalStateText(s.visionHelmetState))
+                .arg(optionalStateText(s.visionMaskState))
+                .arg(optionalStateText(s.visionVestState))
+                .arg(s.visionMissingPpe.isEmpty() || s.visionMissingPpe == QStringLiteral("--")
+                         ? QStringLiteral("无")
+                         : s.visionMissingPpe));
+    }
+    if (m_visionSummaryLabel) {
+        const QString visionText = !s.visionError.isEmpty()
+            ? QStringLiteral("错误：%1").arg(s.visionError)
+            : QStringLiteral("结论：%1").arg(s.visionSummary.isEmpty() ? QStringLiteral("等待视觉结果") : s.visionSummary);
+        m_visionSummaryLabel->setText(visionText);
+    }
+
     m_bottomLabel->setText(
         QStringLiteral("语音助手:%1   |   云端:%2   |   播报:%3")
             .arg(voiceStateToText(s.voiceState))
@@ -820,6 +1014,45 @@ QString MainWindow::repoRootPath() const
         }
     }
     return QDir::currentPath();
+}
+
+void MainWindow::setVisionModeCloud()
+{
+    writeVisionModeRequest(QStringLiteral("cloud"));
+}
+
+void MainWindow::setVisionModeLocal()
+{
+    writeVisionModeRequest(QStringLiteral("local"));
+}
+
+void MainWindow::setVisionModeOff()
+{
+    writeVisionModeRequest(QStringLiteral("off"));
+}
+
+void MainWindow::writeVisionModeRequest(const QString &mode)
+{
+    const QString root = repoRootPath();
+    QDir runtimeDir(QDir(root).filePath(QStringLiteral("runtime/vision")));
+    if (!runtimeDir.exists()) {
+        runtimeDir.mkpath(QStringLiteral("."));
+    }
+    QJsonObject payload;
+    payload.insert(QStringLiteral("mode"), mode);
+    payload.insert(QStringLiteral("updated_at"), QDateTime::currentDateTime().toString(Qt::ISODate));
+    QFile file(runtimeDir.filePath(QStringLiteral("mode_request.json")));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        if (m_visionSummaryLabel) {
+            m_visionSummaryLabel->setText(QStringLiteral("错误：无法写入视觉模式请求文件"));
+        }
+        return;
+    }
+    file.write(QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    file.write("\n");
+    if (m_visionModeLabel) {
+        m_visionModeLabel->setText(QStringLiteral("模式：%1\n请求已写入，等待视觉服务切换").arg(mode));
+    }
 }
 
 void MainWindow::toggleVoiceAssistant()

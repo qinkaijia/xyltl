@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-from app.api.routes import alarms, commands, dashboard, devices, evaluate, telemetry
+from app.api.routes import alarms, commands, dashboard, devices, evaluate, telemetry, vision
 from app.core.config import get_settings
 from app.db.init_db import init_db
 
@@ -43,6 +43,7 @@ app.include_router(alarms.router, prefix=settings.api_prefix)
 app.include_router(commands.router, prefix=settings.api_prefix)
 app.include_router(dashboard.router, prefix=settings.api_prefix)
 app.include_router(evaluate.router, prefix=settings.api_prefix)
+app.include_router(vision.router, prefix=settings.api_prefix)
 
 if WEB_DIR.exists():
     app.mount("/static", StaticFiles(directory=WEB_DIR), name="safecloud-web")

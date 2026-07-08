@@ -58,10 +58,11 @@ int main(int argc, char *argv[])
     const QStringList args = app.arguments();
     const QString statusFile = argumentValue(args, QStringLiteral("--status-file"));
     const QString voiceFile = argumentValue(args, QStringLiteral("--voice-file"));
+    const QString visionFile = argumentValue(args, QStringLiteral("--vision-file"));
     const bool compactMode = args.contains(QStringLiteral("--compact"));
 
     MockDataProvider mockProvider;
-    FinalStatusDataProvider finalStatusProvider(statusFile, voiceFile);
+    FinalStatusDataProvider finalStatusProvider(statusFile, voiceFile, visionFile);
     IDataProvider *provider = statusFile.isEmpty()
         ? static_cast<IDataProvider *>(&mockProvider)
         : static_cast<IDataProvider *>(&finalStatusProvider);

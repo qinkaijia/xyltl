@@ -74,6 +74,26 @@ static bool sensorBool(const QJsonObject &status, const QString &key, bool fallb
     return fallback;
 }
 
+static int optionalBoolState(const QJsonValue &value)
+{
+    if (value.isBool()) {
+        return value.toBool() ? 1 : 0;
+    }
+    if (value.isDouble()) {
+        return value.toDouble() != 0.0 ? 1 : 0;
+    }
+    if (value.isString()) {
+        const QString text = value.toString().trimmed().toLower();
+        if (text == QStringLiteral("true") || text == QStringLiteral("1") || text == QStringLiteral("yes")) {
+            return 1;
+        }
+        if (text == QStringLiteral("false") || text == QStringLiteral("0") || text == QStringLiteral("no")) {
+            return 0;
+        }
+    }
+    return -1;
+}
+
 static QString flameText(bool detected)
 {
     return detected ? QStringLiteral("检测到火焰") : QStringLiteral("未检测到火焰");
@@ -222,8 +242,12 @@ static QString buildModelDetails(const QJsonObject &root, const QJsonObject &sta
     return lines.join(QStringLiteral("\n"));
 }
 
-FinalStatusDataProvider::FinalStatusDataProvider(const QString &statusFile, const QString &voiceFile, QObject *parent)
-    : IDataProvider(parent), m_statusFile(statusFile), m_voiceFile(voiceFile)
+FinalStatusDataProvider::FinalStatusDataProvider(
+    const QString &statusFile,
+    const QString &voiceFile,
+    const QString &visionFile,
+    QObject *parent)
+    : IDataProvider(parent), m_statusFile(statusFile), m_voiceFile(voiceFile), m_visionFile(visionFile)
 {
     m_timer = new QTimer(this);
     m_timer->setInterval(kPollIntervalMs);
@@ -256,7 +280,12 @@ void FinalStatusDataProvider::poll()
         && voiceInfo.exists()
         && voiceInfo.isFile()
         && voiceInfo.lastModified() != m_lastVoiceModified;
-    if (info.lastModified() == m_lastModified && !voiceChanged) {
+    QFileInfo visionInfo(m_visionFile);
+    const bool visionChanged = !m_visionFile.isEmpty()
+        && visionInfo.exists()
+        && visionInfo.isFile()
+        && visionInfo.lastModified() != m_lastVisionModified;
+    if (info.lastModified() == m_lastModified && !voiceChanged && !visionChanged) {
         return;
     }
 
@@ -265,6 +294,9 @@ void FinalStatusDataProvider::poll()
         m_lastModified = info.lastModified();
         if (voiceInfo.exists() && voiceInfo.isFile()) {
             m_lastVoiceModified = voiceInfo.lastModified();
+        }
+        if (visionInfo.exists() && visionInfo.isFile()) {
+            m_lastVisionModified = visionInfo.lastModified();
         }
         emit statusUpdated(status);
     }
@@ -345,6 +377,7 @@ bool FinalStatusDataProvider::loadStatus(SystemStatus *status)
     status->flameLevel = status->flameDetected ? LEVEL_ALARM : LEVEL_NORMAL;
     status->riskLevel = levelFromHighThreshold(status->riskScore, 30.0, 60.0);
     loadVoiceStatus(status);
+    loadVisionStatus(status);
     return true;
 }
 
@@ -371,6 +404,40 @@ void FinalStatusDataProvider::loadVoiceStatus(SystemStatus *status)
     status->assistantSafetyMessage = obj.value(QStringLiteral("safety_message")).toString();
     status->assistantExecuteMessage = obj.value(QStringLiteral("execute_message")).toString();
     status->assistantProvider = obj.value(QStringLiteral("llm_provider")).toString();
+}
+
+void FinalStatusDataProvider::loadVisionStatus(SystemStatus *status)
+{
+    if (m_visionFile.isEmpty()) {
+        return;
+    }
+    QFile file(m_visionFile);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return;
+    }
+    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isObject()) {
+        return;
+    }
+    const QJsonObject root = doc.object();
+    QJsonObject obj = root;
+    if (root.value(QStringLiteral("vision_status")).isObject()) {
+        obj = root.value(QStringLiteral("vision_status")).toObject();
+    }
+    status->visionMode = obj.value(QStringLiteral("mode")).toString();
+    status->visionBackend = obj.value(QStringLiteral("backend")).toString();
+    status->visionStatus = obj.value(QStringLiteral("ppe_status")).toString(QStringLiteral("unknown"));
+    status->visionSummary = obj.value(QStringLiteral("summary")).toString();
+    status->visionMissingPpe = textArray(obj.value(QStringLiteral("missing_ppe")));
+    status->visionImagePath = obj.value(QStringLiteral("image_path")).toString();
+    status->visionError = obj.value(QStringLiteral("error")).toString();
+    status->visionCameraOnline = obj.value(QStringLiteral("camera_online")).toBool(false);
+    status->visionPersonDetected = obj.value(QStringLiteral("person_detected")).toBool(false);
+    status->visionFireDetected = obj.value(QStringLiteral("fire_detected")).toBool(false);
+    status->visionHelmetState = optionalBoolState(obj.value(QStringLiteral("helmet_detected")));
+    status->visionMaskState = optionalBoolState(obj.value(QStringLiteral("mask_detected")));
+    status->visionVestState = optionalBoolState(obj.value(QStringLiteral("reflective_vest_detected")));
+    status->visionLatencyMs = obj.value(QStringLiteral("latency_ms")).toInt(-1);
 }
 
 int FinalStatusDataProvider::voiceStateFromText(const QString &state)

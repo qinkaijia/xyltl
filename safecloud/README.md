@@ -117,6 +117,53 @@ Web 大屏中的“告警控制”页支持向 `board_2k0301` 下发 `fan_contro
 
 301 当前命令解析对 JSON 空格敏感，服务端统一使用 compact JSON 发布，不要把 MQTT payload 改成带空格的格式。
 
+## 视觉评估接口
+
+SafeCloud 新增视觉接口，用于接收 2K1000LA USB 摄像头关键帧，并调用豆包视觉模型进行人员安全评估。
+
+环境变量：
+
+```bash
+export DOUBAO_API_KEY="你的豆包 API Key"
+export DOUBAO_API_URL="https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+export DOUBAO_VISION_MODEL="doubao-seed-1-6-vision-250615"
+```
+
+接口：
+
+- `POST /api/vision/evaluate`：上传 `image_base64`，返回 `vision_status`。
+- `GET /api/vision/latest`：返回最近一次视觉评估。
+- `GET /api/vision/latest-image`：返回最近一帧 JPEG。
+- `GET /api/vision/mode` / `POST /api/vision/mode`：读取或切换视觉模式，取值 `cloud/local/off`。
+
+手动测试：
+
+```bash
+python - <<'PY'
+import base64
+import json
+import urllib.request
+
+image_path = "runtime/vision/latest.jpg"
+payload = {
+    "device_id": "board_2k1000la",
+    "image_base64": base64.b64encode(open(image_path, "rb").read()).decode("ascii"),
+    "image_mime": "image/jpeg",
+    "mode": "cloud",
+    "include_debug": True,
+}
+req = urllib.request.Request(
+    "http://127.0.0.1:8010/api/vision/evaluate",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={"Content-Type": "application/json"},
+    method="POST",
+)
+print(urllib.request.urlopen(req, timeout=60).read().decode("utf-8"))
+PY
+```
+
+Web 大屏新增“视觉巡检”页面，可显示关键帧、人员 PPE 状态，并切换 `cloud/local/off`。如果要让网页切换真实影响板端服务，板端 `vision_service.py` 需要使用 `--follow-cloud-mode` 启动。
+
 ## Analyzer 评估接口
 
 Mock 模式：

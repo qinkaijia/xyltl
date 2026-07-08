@@ -12,7 +12,11 @@ class FinalStatusDataProvider : public IDataProvider
 {
     Q_OBJECT
 public:
-    explicit FinalStatusDataProvider(const QString &statusFile, const QString &voiceFile = QString(), QObject *parent = nullptr);
+    explicit FinalStatusDataProvider(
+        const QString &statusFile,
+        const QString &voiceFile = QString(),
+        const QString &visionFile = QString(),
+        QObject *parent = nullptr);
     ~FinalStatusDataProvider() override;
 
     void start() override;
@@ -24,14 +28,17 @@ private slots:
 private:
     bool loadStatus(SystemStatus *status);
     void loadVoiceStatus(SystemStatus *status);
+    void loadVisionStatus(SystemStatus *status);
     static int voiceStateFromText(const QString &state);
     static int levelFromHighThreshold(double value, double warning, double alarm);
 
     QString m_statusFile;
     QString m_voiceFile;
+    QString m_visionFile;
     QTimer *m_timer = nullptr;
     QDateTime m_lastModified;
     QDateTime m_lastVoiceModified;
+    QDateTime m_lastVisionModified;
 };
 
 #endif // FINALSTATUSDATAPROVIDER_H

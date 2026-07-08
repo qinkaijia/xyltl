@@ -1,10 +1,11 @@
-const PAGE_NAMES = ["overview", "monitor", "analysis", "operations"];
+const PAGE_NAMES = ["overview", "monitor", "analysis", "vision", "operations"];
 
 const state = {
   apiBase: defaultApiBase(),
   activePage: getInitialPage(),
   summary: null,
   latestEvaluation: null,
+  latestVision: null,
   devices: [],
   alarms: [],
   evaluateScenarios: {
@@ -110,6 +111,18 @@ const els = {
   runEvaluateButton: document.querySelector("#runEvaluateButton"),
   evaluateStatus: document.querySelector("#evaluateStatus"),
   evaluateResult: document.querySelector("#evaluateResult"),
+  visionModeText: document.querySelector("#visionModeText"),
+  visionImage: document.querySelector("#visionImage"),
+  visionImageEmpty: document.querySelector("#visionImageEmpty"),
+  visionStatusPill: document.querySelector("#visionStatusPill"),
+  visionPerson: document.querySelector("#visionPerson"),
+  visionHelmet: document.querySelector("#visionHelmet"),
+  visionMask: document.querySelector("#visionMask"),
+  visionVest: document.querySelector("#visionVest"),
+  visionSummary: document.querySelector("#visionSummary"),
+  visionMissing: document.querySelector("#visionMissing"),
+  visionBackend: document.querySelector("#visionBackend"),
+  visionModeButtons: Array.from(document.querySelectorAll("[data-vision-mode]")),
 };
 
 els.apiBaseInput.value = state.apiBase;
@@ -262,6 +275,28 @@ function alarmLabel(level) {
   if (Number(level) === 1 || level === "warning") return "预警";
   if (level === "active") return "激活";
   return "正常";
+}
+
+function ppeStatusLabel(status) {
+  const labels = {
+    pass: "防护合规",
+    fail: "防护缺失",
+    unknown: "等待识别",
+    error: "视觉异常",
+  };
+  return labels[status] || "等待识别";
+}
+
+function ppeStatusClass(status) {
+  if (status === "fail" || status === "error") return "critical";
+  if (status === "unknown") return "warning";
+  return "normal";
+}
+
+function boolLabel(value, trueText = "是", falseText = "否", unknownText = "未确认") {
+  if (value === true) return trueText;
+  if (value === false) return falseText;
+  return unknownText;
 }
 
 function deviceStatusLabel(status) {
@@ -556,18 +591,21 @@ async function refresh() {
   localStorage.setItem("safecloud.apiBase", state.apiBase);
   setConnection(false, "连接中");
   try {
-    const [summary, devices, latestEvaluation] = await Promise.all([
+    const [summary, devices, latestEvaluation, latestVision] = await Promise.all([
       request("/api/dashboard/summary"),
       request("/api/devices"),
       requestOptional("/api/evaluate/latest"),
+      requestOptional("/api/vision/latest"),
     ]);
     state.summary = summary;
     state.devices = devices;
     state.latestEvaluation = latestEvaluation;
+    state.latestVision = latestVision;
     renderKpis();
     renderMetrics();
     renderAlarms();
     renderDevices();
+    renderVision();
     setConnection(true, "已连接");
   } catch (error) {
     console.error(error);
@@ -813,6 +851,61 @@ function renderEvaluateResult(result) {
   `;
 }
 
+function renderVision() {
+  const status = state.latestVision?.response?.vision_status || state.latestVision?.vision_status || null;
+  if (!status) {
+    els.visionModeText.textContent = "等待视觉服务";
+    els.visionStatusPill.className = "pill warning";
+    els.visionStatusPill.textContent = "等待识别";
+    els.visionPerson.textContent = "--";
+    els.visionHelmet.textContent = "--";
+    els.visionMask.textContent = "--";
+    els.visionVest.textContent = "--";
+    els.visionSummary.textContent = "等待 2K1000LA 摄像头服务写入结果";
+    els.visionMissing.textContent = "--";
+    els.visionBackend.textContent = "--";
+    els.visionImage.removeAttribute("src");
+    els.visionImage.classList.remove("is-visible");
+    els.visionImageEmpty.classList.remove("is-hidden");
+    return;
+  }
+
+  const ppe = status.ppe_status || "unknown";
+  els.visionModeText.textContent = `模式 ${status.mode || "--"} / 延迟 ${status.latency_ms ?? "--"} ms`;
+  els.visionStatusPill.className = `pill ${ppeStatusClass(ppe)}`;
+  els.visionStatusPill.textContent = ppeStatusLabel(ppe);
+  els.visionPerson.textContent = boolLabel(status.person_detected, "检测到", "未检测到");
+  els.visionHelmet.textContent = boolLabel(status.helmet_detected, "已佩戴", "未佩戴");
+  els.visionMask.textContent = boolLabel(status.mask_detected, "已佩戴", "未佩戴");
+  els.visionVest.textContent = boolLabel(status.reflective_vest_detected, "已穿戴", "未穿戴");
+  els.visionSummary.textContent = status.error || status.summary || "等待视觉结果";
+  els.visionMissing.textContent = (status.missing_ppe || []).length ? status.missing_ppe.join(" / ") : "无";
+  els.visionBackend.textContent = `${status.backend || "--"} / 摄像头${status.camera_online ? "在线" : "离线"}`;
+
+  if (status.image_available) {
+    els.visionImage.src = apiUrl(`/api/vision/latest-image?t=${Date.now()}`);
+    els.visionImage.classList.add("is-visible");
+    els.visionImageEmpty.classList.add("is-hidden");
+  } else {
+    els.visionImage.removeAttribute("src");
+    els.visionImage.classList.remove("is-visible");
+    els.visionImageEmpty.classList.remove("is-hidden");
+  }
+}
+
+async function setVisionMode(mode) {
+  try {
+    const result = await request("/api/vision/mode", {
+      method: "POST",
+      body: JSON.stringify({ mode }),
+    });
+    els.visionModeText.textContent = `模式切换请求：${result.mode}`;
+  } catch (error) {
+    console.error(error);
+    els.visionModeText.textContent = `模式切换失败：${error.message}`;
+  }
+}
+
 els.pageTabs.forEach((tab) => {
   tab.addEventListener("click", () => setActivePage(tab.dataset.pageTab));
 });
@@ -822,6 +915,9 @@ els.loadAlarmsButton.addEventListener("click", loadAllAlarms);
 els.commandForm.addEventListener("submit", submitCommandV2);
 els.commandType.addEventListener("change", refreshCommandPreset);
 els.runEvaluateButton.addEventListener("click", runEvaluate);
+els.visionModeButtons.forEach((button) => {
+  button.addEventListener("click", () => setVisionMode(button.dataset.visionMode));
+});
 window.addEventListener("hashchange", () => setActivePage(getInitialPage(), false));
 window.addEventListener("resize", () => {
   if (state.activePage === "monitor") redrawChartSoon();

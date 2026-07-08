@@ -48,7 +48,8 @@
 - Qt HMI 原型可基于 mock 数据展示状态，也可读取 `/api/evaluate` 输出文件展示云端分析结果和模型详情。
 - Qt HMI 已支持 800x480 紧凑模式、屏幕选择和窗口几何参数，适配板端双屏调试。
 - 语音 demo 已支持持续监听真实收音、listen-only 收音验证和 ALSA 录音设备选择。
-- SafeCloud Web Dashboard 已优化为分页面控制台，分为监护总览、环境监测、AI 评估、告警控制。
+- SafeCloud Web Dashboard 已优化为分页面控制台，分为监护总览、环境监测、AI 评估、视觉巡检、告警控制。
+- USB 摄像头视觉模块已建立端云接口：2K1000LA `vision_service.py` 支持 `cloud/local/off` 互斥模式，SafeCloud 新增 `/api/vision/*`，Qt HMI 和 Web Dashboard 均新增视觉页面显示关键帧、人员 PPE 状态和模式切换入口。
 - 2K1000LA 已安装并运行 Mosquitto，作为 301 与主控之间的 MQTT Broker。
 - 301 `/home/root/main` 已能向 2K1000LA 发布真实传感器数据和心跳。
 - 2K1000LA `cloud_client.py --sensor-source 2k0301` 已能读取真实 301 数据并调用电脑 SafeCloud `/api/evaluate`。
@@ -67,9 +68,10 @@
 
 1. 赛前做更长时间稳定性复测，重点看 MQTT 重连、云端超时回退和 301 重启恢复。
 2. 在板端配置真实大模型 API Key 环境变量，做语音问答的真实云端调用复测。
-3. 根据现场交互需求，把 Qt HMI 控制按钮接入已验证的 `modules/control` 命令客户端。
-4. 最后阶段再配置板端开机自启动。
-5. 将关键报警动作继续保持在本地规则链路中，不依赖云端单点决策。
+3. 在 2K1000LA 上接入真实 USB 摄像头做云端豆包视觉实测；本地 YOLO/NCNN 只在需要断网兜底时启用，避免和云端模式同时占用内存。
+4. 根据现场交互需求，把 Qt HMI 控制按钮接入已验证的 `modules/control` 命令客户端。
+5. 最后阶段再配置板端开机自启动。
+6. 将关键报警动作继续保持在本地规则链路中，不依赖云端单点决策。
 
 当前真实联调细节和命令见 `NEXT_STEPS.md`。
 301 当前运行与编译记录见 `docs/integration/2k0301_current_runtime_notes.md`。

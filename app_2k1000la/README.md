@@ -199,6 +199,63 @@ python3 app_2k1000la/cloud_client.py \
   --output-file runtime/fallback_response.json
 ```
 
+## USB 摄像头视觉服务
+
+文件：`vision_service.py`
+
+用途：在 2K1000LA 上采集 USB 摄像头关键帧，并按模式执行视觉安全评估。
+
+- `cloud`：上传关键帧到 SafeCloud `POST /api/vision/evaluate`，由豆包视觉模型评估人员 PPE。
+- `local`：调用本地 `loongson-safety-vision` YOLO/NCNN 推理，适合作为断网兜底。
+- `off`：关闭视觉模块，释放摄像头和本地推理资源。
+
+板端安装依赖：
+
+```bash
+sudo apt update
+sudo apt install python3-opencv
+pip3 install -r app_2k1000la/requirements.txt
+```
+
+云端视觉常驻示例：
+
+```bash
+python3 app_2k1000la/vision_service.py \
+  --base-url http://192.168.43.5:8010 \
+  --camera-index 0 \
+  --mode cloud \
+  --output-dir runtime/vision \
+  --loop \
+  --interval 5 \
+  --include-debug
+```
+
+联动网页模式切换：
+
+```bash
+python3 app_2k1000la/vision_service.py \
+  --follow-cloud-mode \
+  --camera-index 0 \
+  --output-dir runtime/vision \
+  --loop
+```
+
+Qt HMI 启动时读取视觉状态：
+
+```bash
+./display_qt_app \
+  --status-file runtime/latest_evaluate_response.json \
+  --voice-file runtime/voice_assistant_state.json \
+  --vision-file runtime/vision/vision_state.json
+```
+
+本地 YOLO 目录可通过环境变量指定：
+
+```bash
+export LOONGSON_SAFETY_VISION_DIR=$HOME/loongson-safety-vision
+python3 app_2k1000la/vision_service.py --mode local --loop
+```
+
 ## 测试
 
 ```bash
