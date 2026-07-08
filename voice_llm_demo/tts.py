@@ -18,20 +18,24 @@ class VoiceSpeaker:
         self.output_dir = Path("data/tts")
         self._baidu_token = ""
 
-    def speak(self, text: str) -> None:
+    def speak(self, text: str) -> bool:
         clean = " ".join(str(text or "").split())
         if not clean or self.mode == "none":
-            return
+            return False
         clean = clean[: config.VOICE_TTS_MAX_CHARS]
         try:
             if self.mode == "print":
                 print("[TTS] {}".format(clean))
+                return True
             elif self.mode == "baidu":
                 self._speak_baidu(clean)
+                return True
             else:
                 print("未知 VOICE_TTS_MODE={}，跳过播报。".format(self.mode))
+                return False
         except Exception as exc:  # noqa: BLE001 - field demo must not crash on TTS.
             print("语音播报失败：{}".format(exc))
+            return False
 
     def _speak_baidu(self, text: str) -> None:
         if not shutil.which("aplay"):

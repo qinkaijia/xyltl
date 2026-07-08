@@ -19,3 +19,18 @@ def test_audio_mode_falls_back_when_file_missing(tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert ok is False
     assert "预录音频不存在" in captured.out
+
+
+def test_baidu_mode_routes_to_baidu_speaker(monkeypatch):
+    spoken = []
+
+    def fake_speak_baidu(self, text):
+        spoken.append(text)
+        return True
+
+    monkeypatch.setattr(VoiceTextPlayer, "_speak_baidu", fake_speak_baidu)
+
+    ok = VoiceTextPlayer("baidu").speak("当前设备处于报警状态。")
+
+    assert ok is True
+    assert spoken == ["当前设备处于报警状态。"]

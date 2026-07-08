@@ -1,6 +1,8 @@
 import argparse
 
+import app_2k1000la.cloud_client as cloud_client_module
 from app_2k1000la.cloud_client import (
+    VoiceAlertManager,
     build_mqtt_config,
     extract_2k0301_fields,
     local_fallback_status,
@@ -116,3 +118,55 @@ def test_build_mqtt_config_returns_none_for_mock_source():
     args = argparse.Namespace(sensor_source="mock")
 
     assert build_mqtt_config(args) is None
+
+
+def test_voice_alert_manager_speaks_alerts_with_cooldown(monkeypatch):
+    spoken = []
+
+    def fake_speak(response, tts_mode=""):
+        spoken.append((response["final_status"]["voice_text"], tts_mode))
+        return True
+
+    monkeypatch.setattr(cloud_client_module, "speak_response", fake_speak)
+    manager = VoiceAlertManager(enabled=True, tts_mode="print", cooldown_seconds=30)
+
+    normal = {
+        "final_status": {
+            "alarm_level": 0,
+            "need_voice_alert": False,
+            "voice_text": "当前设备处于正常状态。",
+            "status_text": "正常",
+            "reason": "所有关键指标处于正常范围",
+        }
+    }
+    first_alarm = {
+        "final_status": {
+            "alarm_level": 2,
+            "need_voice_alert": True,
+            "voice_text": "当前设备处于报警状态。温度过高。",
+            "status_text": "报警",
+            "reason": "温度过高",
+            "suggestion": "立即排查现场。",
+        }
+    }
+    changed_alarm = {
+        "final_status": {
+            "alarm_level": 2,
+            "need_voice_alert": True,
+            "voice_text": "当前设备处于报警状态。检测到火焰。",
+            "status_text": "报警",
+            "reason": "检测到火焰",
+            "suggestion": "立即撤离并处理火源。",
+        }
+    }
+
+    assert manager.maybe_speak(normal, now=100) is False
+    assert manager.maybe_speak(first_alarm, now=101) is True
+    assert manager.maybe_speak(first_alarm, now=110) is False
+    assert manager.maybe_speak(changed_alarm, now=111) is True
+    assert manager.maybe_speak(changed_alarm, now=142) is True
+    assert spoken == [
+        ("当前设备处于报警状态。温度过高。", "print"),
+        ("当前设备处于报警状态。检测到火焰。", "print"),
+        ("当前设备处于报警状态。检测到火焰。", "print"),
+    ]

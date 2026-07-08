@@ -16,6 +16,7 @@
 - 将返回结果写入本地 JSON，供 Qt HMI 使用。
 - 请求失败、超时或返回异常时，使用端侧本地阈值规则生成 `local_http_fallback`。
 - 可选 `--speak`，把 `final_status.voice_text` 交给 `voice/voice_text_player.py` 播报。
+- 可选 `--speak-on-alert`，仅在预警/报警时播报风险原因和处置建议，并用 `--alert-cooldown-seconds` 控制重复提醒间隔。
 - 可选 `--loop`，作为简易常驻轮询进程运行。
 
 ## 数据源模式
@@ -118,6 +119,23 @@ python3 app_2k1000la/cloud_client.py \
   --tts-mode print
 ```
 
+报警时自动播报示例：
+
+```bash
+python3 app_2k1000la/cloud_client.py \
+  --base-url http://192.168.43.5:8010 \
+  --sensor-source 2k0301 \
+  --mqtt-host 127.0.0.1 \
+  --mqtt-port 1883 \
+  --output-file runtime/latest_evaluate_response.json \
+  --include-debug \
+  --loop \
+  --interval 2 \
+  --speak-on-alert \
+  --tts-mode baidu \
+  --alert-cooldown-seconds 30
+```
+
 常驻轮询：
 
 ```bash
@@ -146,6 +164,7 @@ app_2k1000la/scripts/install_safecloud_client_user_service.sh
 - 默认使用 `XYLT_SENSOR_SOURCE=mock` 循环模拟数据。
 - 输出到 `runtime/latest_evaluate_response.json`，供 Qt HMI 的 `--status-file` 读取。
 - 使用 `SAFECLOUD_BASE_URL`、缓存和 UDP 自动发现做网络适配。
+- 预警/报警时默认触发 `--speak-on-alert`，`XYLT_TTS_MODE=print` 可改为 `baidu/audio/espeak/spd-say/none`。
 
 配置文件位于：
 
@@ -166,6 +185,8 @@ XYLT_2K0301_STALE_AFTER=5
 XYLT_SCENARIO_FILE=tests/scenarios/evaluate/gas_alarm.json
 XYLT_OUTPUT_FILE=runtime/latest_evaluate_response.json
 XYLT_INTERVAL=2
+XYLT_TTS_MODE=baidu
+XYLT_ALERT_COOLDOWN_SECONDS=30
 ```
 
 查看状态和日志：

@@ -37,6 +37,8 @@ class VoiceTextPlayer:
             return self._run(["spd-say", text], text)
         if self.mode == "audio":
             return self._play_audio(text)
+        if self.mode == "baidu":
+            return self._speak_baidu(text)
 
         print(f"[voice] 未知 VOICE_TTS_MODE={self.mode}，回退打印：{text}")
         return True
@@ -58,6 +60,19 @@ class VoiceTextPlayer:
             return self.audio_dir / "normal.wav"
         return self.audio_dir / "default.wav"
 
+    def _speak_baidu(self, text: str) -> bool:
+        voice_demo_dir = Path(__file__).resolve().parents[1] / "voice_llm_demo"
+        if str(voice_demo_dir) not in sys.path:
+            sys.path.insert(0, str(voice_demo_dir))
+        try:
+            from tts import VoiceSpeaker  # type: ignore
+
+            return bool(VoiceSpeaker("baidu").speak(text))
+        except Exception as exc:  # noqa: BLE001 - alarm voice must not crash the monitor loop.
+            print(f"[voice] 百度 TTS 播报失败，回退打印：{text}")
+            print(f"[voice] 错误：{exc}")
+            return False
+
     @staticmethod
     def _run(command: list[str], fallback_text: str) -> bool:
         try:
@@ -78,7 +93,7 @@ def load_payload(path: str) -> Dict[str, Any]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Speak voice_text from SafeCloud/analyzer JSON.")
     parser.add_argument("--input-file", default="-", help="Response JSON file, or '-' for stdin.")
-    parser.add_argument("--mode", default="", choices=["", "print", "none", "espeak", "spd-say", "audio"])
+    parser.add_argument("--mode", default="", choices=["", "print", "none", "espeak", "spd-say", "audio", "baidu"])
     return parser.parse_args()
 
 

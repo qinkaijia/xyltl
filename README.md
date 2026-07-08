@@ -117,16 +117,21 @@ env PYTHONUNBUFFERED=1 PYTHONPATH=. python3 app_2k1000la/cloud_client.py \
   --include-debug \
   --loop \
   --interval 2 \
-  --timeout 20
+  --timeout 20 \
+  --speak-on-alert \
+  --tts-mode baidu \
+  --alert-cooldown-seconds 30
 ```
 
 后台运行时：
 
 ```bash
 cd ~/xylt
-nohup sh -c 'env PYTHONUNBUFFERED=1 PYTHONPATH=. python3 app_2k1000la/cloud_client.py --base-url http://192.168.43.5:8010 --sensor-source 2k0301 --mqtt-host 127.0.0.1 --mqtt-port 1883 --output-file runtime/latest_evaluate_response.json --include-debug --loop --interval 2 --timeout 20' \
+nohup sh -c 'env PYTHONUNBUFFERED=1 PYTHONPATH=. python3 app_2k1000la/cloud_client.py --base-url http://192.168.43.5:8010 --sensor-source 2k0301 --mqtt-host 127.0.0.1 --mqtt-port 1883 --output-file runtime/latest_evaluate_response.json --include-debug --loop --interval 2 --timeout 20 --speak-on-alert --tts-mode baidu --alert-cooldown-seconds 30' \
   > /tmp/xylt_cloud_client.log 2>&1 &
 ```
+
+`--speak-on-alert` 只在 `final_status.need_voice_alert=true` 或 `alarm_level>0` 时播报当前风险原因和处置建议；同一风险默认 30 秒内不重复播报，风险内容变化会立即重新播报。没有百度 TTS 环境时，可把 `--tts-mode baidu` 临时改成 `print` 做联调。
 
 检查输出：
 

@@ -296,12 +296,84 @@ def write_json(path: Optional[str], payload: Dict[str, Any]) -> None:
     output_path.write_text(text + "\n", encoding="utf-8")
 
 
-def run_once(args: argparse.Namespace, client: SafeCloudClient, payload: Dict[str, Any]) -> Dict[str, Any]:
+def env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
+def status_needs_voice_alert(status: Dict[str, Any]) -> bool:
+    return bool(status.get("need_voice_alert")) or number(status.get("alarm_level"), 0.0) > 0
+
+
+def alert_signature(status: Dict[str, Any]) -> str:
+    sensor_metrics = status.get("sensor_metrics") if isinstance(status.get("sensor_metrics"), dict) else {}
+    payload = {
+        "alarm_level": status.get("alarm_level"),
+        "status_text": status.get("status_text"),
+        "reason": status.get("reason"),
+        "suggestion": status.get("suggestion"),
+        "temperature": sensor_metrics.get("temperature", status.get("temperature")),
+        "humidity": sensor_metrics.get("humidity", status.get("humidity")),
+        "tvoc": sensor_metrics.get("tvoc", status.get("tvoc")),
+        "eco2": sensor_metrics.get("eco2", status.get("eco2")),
+        "mq3_value": sensor_metrics.get("mq3_value", status.get("mq3_value")),
+        "flame_detected": sensor_metrics.get("flame_detected", status.get("flame_detected")),
+        "risk_score": sensor_metrics.get("risk_score", status.get("risk_score")),
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+
+
+class VoiceAlertManager:
+    def __init__(self, enabled: bool, tts_mode: str = "", cooldown_seconds: float = 30.0) -> None:
+        self.enabled = enabled
+        self.tts_mode = tts_mode
+        self.cooldown_seconds = max(0.0, cooldown_seconds)
+        self.last_signature = ""
+        self.last_spoken_at = 0.0
+
+    def maybe_speak(self, response: Dict[str, Any], now: Optional[float] = None) -> bool:
+        if not self.enabled:
+            return False
+        status = response.get("final_status")
+        if not isinstance(status, dict):
+            return False
+        if not status_needs_voice_alert(status):
+            self.last_signature = ""
+            self.last_spoken_at = 0.0
+            return False
+
+        current_time = time.time() if now is None else now
+        signature = alert_signature(status)
+        should_speak = (
+            signature != self.last_signature
+            or self.last_spoken_at <= 0
+            or current_time - self.last_spoken_at >= self.cooldown_seconds
+        )
+        if not should_speak:
+            return False
+
+        spoken = speak_response(response, self.tts_mode)
+        self.last_signature = signature
+        self.last_spoken_at = current_time
+        return spoken
+
+
+def run_once(
+    args: argparse.Namespace,
+    client: SafeCloudClient,
+    payload: Dict[str, Any],
+    alert_manager: Optional[VoiceAlertManager] = None,
+) -> Dict[str, Any]:
     response = evaluate_with_fallback(client, payload)
     if args.output_file:
         write_json(args.output_file, response)
-    if args.speak:
-        speak_response(response, args.tts_mode)
+    spoken = False
+    if getattr(args, "speak", False):
+        spoken = speak_response(response, args.tts_mode)
+    elif alert_manager is not None:
+        spoken = alert_manager.maybe_speak(response)
 
     final_status = response["final_status"]
     debug_client = (response.get("debug") or {}).get("client") or {}
@@ -310,17 +382,18 @@ def run_once(args: argparse.Namespace, client: SafeCloudClient, payload: Dict[st
         f"level={final_status['alarm_level']} "
         f"mode={final_status['analysis_mode']} "
         f"voice_alert={final_status['need_voice_alert']} "
+        f"alert_spoken={spoken} "
         f"base_url={client.base_url} "
         f"elapsed_ms={debug_client.get('elapsed_ms')}"
     )
     return response
 
 
-def speak_response(response: Dict[str, Any], tts_mode: str = "") -> None:
+def speak_response(response: Dict[str, Any], tts_mode: str = "") -> bool:
     if VoiceTextPlayer is None or extract_voice_text is None:
         print("[voice] voice module unavailable, skip speaking")
-        return
-    VoiceTextPlayer(tts_mode).speak(extract_voice_text(response))
+        return False
+    return VoiceTextPlayer(tts_mode).speak(extract_voice_text(response))
 
 
 def parse_args() -> argparse.Namespace:
@@ -339,7 +412,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--force-model", default="")
     parser.add_argument("--include-debug", action="store_true")
     parser.add_argument("--speak", action="store_true", help="Speak final_status.voice_text after evaluate.")
-    parser.add_argument("--tts-mode", default="", choices=["", "print", "none", "espeak", "spd-say", "audio"])
+    parser.add_argument(
+        "--speak-on-alert",
+        action="store_true",
+        help="Only speak when final_status.need_voice_alert is true or alarm_level is greater than zero.",
+    )
+    parser.add_argument(
+        "--alert-cooldown-seconds",
+        type=float,
+        default=env_float("XYLT_ALERT_COOLDOWN_SECONDS", 30.0),
+        help="Minimum interval before repeating the same voice alert.",
+    )
+    parser.add_argument("--tts-mode", default="", choices=["", "print", "none", "espeak", "spd-say", "audio", "baidu"])
     parser.add_argument("--cache-file", default=default_cache_file())
     parser.add_argument("--discovery-port", type=int, default=int(os.environ.get("SAFECLOUD_DISCOVERY_PORT", "8011")))
     parser.add_argument("--discovery-timeout", type=float, default=3.0)
@@ -375,6 +459,7 @@ def main() -> None:
     )
     print(f"safecloud_base_url={base_url} source={source}")
     client = SafeCloudClient(base_url, args.timeout)
+    alert_manager = VoiceAlertManager(args.speak_on_alert, args.tts_mode, args.alert_cooldown_seconds)
 
     while True:
         try:
@@ -386,7 +471,7 @@ def main() -> None:
             )
         except SensorSourceError as exc:
             raise SystemExit(f"数据源读取失败：{exc}") from exc
-        run_once(args, client, payload)
+        run_once(args, client, payload, alert_manager)
         if not args.loop:
             break
         time.sleep(args.interval)

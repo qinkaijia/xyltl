@@ -21,7 +21,10 @@ cat runtime/latest_evaluate_response.json | python3 voice/voice_text_player.py -
 ```bash
 VOICE_TTS_MODE=espeak python3 voice/voice_text_player.py --input-file runtime/latest_evaluate_response.json
 VOICE_TTS_MODE=spd-say python3 voice/voice_text_player.py --input-file runtime/latest_evaluate_response.json
+VOICE_TTS_MODE=baidu python3 voice/voice_text_player.py --input-file runtime/latest_evaluate_response.json
 ```
+
+`baidu` 模式复用 `voice_llm_demo/tts.py`，需要在运行环境或 `voice_llm_demo/.env` 中配置 `BAIDU_API_KEY`、`BAIDU_SECRET_KEY`，并保证板端可用 `aplay` 播放。
 
 预录音频模式：
 
@@ -49,6 +52,24 @@ python3 app_2k1000la/cloud_client.py \
   --speak \
   --tts-mode print
 ```
+
+常驻系统建议使用报警触发播报，避免每次轮询都重复播：
+
+```bash
+python3 app_2k1000la/cloud_client.py \
+  --base-url http://192.168.43.5:8010 \
+  --sensor-source 2k0301 \
+  --mqtt-host 127.0.0.1 \
+  --output-file runtime/latest_evaluate_response.json \
+  --include-debug \
+  --loop \
+  --interval 2 \
+  --speak-on-alert \
+  --tts-mode baidu \
+  --alert-cooldown-seconds 30
+```
+
+`--speak-on-alert` 会在 `need_voice_alert=true` 或 `alarm_level>0` 时播报 `final_status.voice_text`，同一风险默认 30 秒内不重复播报，风险原因变化会立即重新播报。
 
 ## 说明
 

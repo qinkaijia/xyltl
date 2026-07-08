@@ -19,8 +19,10 @@ Environment=XYLT_OUTPUT_FILE=runtime/latest_evaluate_response.json
 Environment=XYLT_TIMEOUT=30
 Environment=XYLT_DISCOVERY_TIMEOUT=3
 Environment=XYLT_INTERVAL=2
+Environment=XYLT_TTS_MODE=print
+Environment=XYLT_ALERT_COOLDOWN_SECONDS=30
 EnvironmentFile=-%h/.config/xylt/safecloud-client.env
-ExecStart=/usr/bin/python3 @REPO_ROOT@/app_2k1000la/cloud_client.py --sensor-source ${XYLT_SENSOR_SOURCE} --scenario-file ${XYLT_SCENARIO_FILE} --output-file ${XYLT_OUTPUT_FILE} --timeout ${XYLT_TIMEOUT} --discovery-timeout ${XYLT_DISCOVERY_TIMEOUT} --include-debug --loop --interval ${XYLT_INTERVAL}
+ExecStart=/usr/bin/python3 @REPO_ROOT@/app_2k1000la/cloud_client.py --sensor-source ${XYLT_SENSOR_SOURCE} --scenario-file ${XYLT_SCENARIO_FILE} --output-file ${XYLT_OUTPUT_FILE} --timeout ${XYLT_TIMEOUT} --discovery-timeout ${XYLT_DISCOVERY_TIMEOUT} --include-debug --loop --interval ${XYLT_INTERVAL} --speak-on-alert --tts-mode ${XYLT_TTS_MODE} --alert-cooldown-seconds ${XYLT_ALERT_COOLDOWN_SECONDS}
 Restart=always
 RestartSec=3
 KillSignal=SIGINT
