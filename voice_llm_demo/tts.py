@@ -68,7 +68,8 @@ class VoiceSpeaker:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         path = self.output_dir / "reply_{}.wav".format(int(time.time() * 1000))
         path.write_bytes(body)
-        subprocess.run(["aplay", "-q", str(path)], check=False, timeout=20)
+        playback_timeout = max(30, min(90, int(len(text) * 0.45) + 12))
+        subprocess.run(["aplay", "-q", str(path)], check=False, timeout=playback_timeout)
 
     def _get_baidu_token(self) -> str:
         if self._baidu_token:

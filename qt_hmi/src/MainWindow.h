@@ -52,6 +52,7 @@ private:
     void setVoiceButtonRunning(bool running);
     void writeVisionModeRequest(const QString &mode);
     void updateVisionImage(const SystemStatus &status);
+    void appendLogLine(const QString &line);
 
     StatusModel *m_model = nullptr;
     bool m_compactMode = false;
@@ -95,6 +96,9 @@ private:
     QListWidget *m_alarmList = nullptr;
     QLabel *m_bottomLabel = nullptr;
     QString m_modelDetailsText;
+    QString m_lastSystemLogSignature;
+    QString m_lastVoiceLogSignature;
+    QString m_lastVisionLogSignature;
     QTimer *m_voiceAnimationTimer = nullptr;
     int m_voiceAnimationFrame = 0;
     int m_lastVoiceState = VOICE_IDLE;

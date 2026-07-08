@@ -310,6 +310,8 @@ export BAIDU_SECRET_KEY="你的百度 Secret Key"
 
 Qt 启动的语音进程是非交互模式，若云端 ASR 失败，会提示重说或检查配置，不会卡在手动输入。单独说“小龙”或“在吗”会打开 `VOICE_WAKE_WINDOW_SECONDS` 秒唤醒窗口，窗口内下一句话无需重复唤醒词；每次回答完成后也会自动续同样的追问窗口，超过窗口时间未继续说话才回到待唤醒。当前语音识别是“一句话录完后识别”，不是流式字幕；如果要边说边显示文字，需要后续接入流式 ASR。
 
+如果出现“话还没说完录音就停”，优先调 `END_SILENCE_SECONDS` 和 `MAX_RECORD_SECONDS`：当前默认分别为 `1.8` 秒和 `15` 秒。如果出现“回答播报到一半就停”，优先检查 `VOICE_TTS_MAX_CHARS` 和 TTS 播放超时：当前默认播报上限为 `180` 字，百度 TTS 播放超时会随文本长度放宽。Qt 日志页会显示系统、语音、视觉和报警事件；语音进程原始日志写入 `runtime/voice_assistant_process.log`，交互 JSON 日志写入 `voice_llm_demo/logs/demo.log`。
+
 常驻 `cloud_client --loop` 建议用于快速刷新状态，不建议每 10 秒都启用真实多模型评测。正式评测或演示 AI 结论时，再通过网页按钮或单次命令启用真实 LLM，可避免传感器离线/异常时频繁调用云端导致界面变慢。
 
 也可将 `--llm-provider` 改为 `doubao`、`deepseek`、`kimi`、`zhipu`，并配置对应 `DOUBAO_API_KEY`、`DEEPSEEK_API_KEY`、`KIMI_API_KEY`、`ZHIPU_API_KEY`。

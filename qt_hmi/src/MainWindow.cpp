@@ -584,7 +584,7 @@ QWidget *MainWindow::createLogPage()
                                m_compactMode ? 10 : 18, m_compactMode ? 8 : 14);
     layout->setSpacing(m_compactMode ? 6 : 10);
 
-    QLabel *logTitle = new QLabel(QStringLiteral("报警与事件日志"));
+    QLabel *logTitle = new QLabel(QStringLiteral("系统事件日志"));
     logTitle->setStyleSheet(
         QStringLiteral("color:%1; font-size:%2px; font-weight:700; background:transparent;")
             .arg(kMutedColor)
@@ -598,8 +598,9 @@ QWidget *MainWindow::createLogPage()
             .arg(kCardColor)
             .arg(kLineColor)
             .arg(m_compactMode ? 14 : 20)
-            .arg(kAlarmColor)
+            .arg(kTextColor)
             .arg(m_compactMode ? 6 : 10));
+    m_alarmList->addItem(QStringLiteral("系统日志已启动，等待事件。"));
     layout->addWidget(m_alarmList, 1);
     return page;
 }
@@ -932,15 +933,81 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
     if (m_voiceReplyLabel) {
         m_voiceReplyLabel->setText(QStringLiteral("答：%1%2").arg(reply, exec));
     }
+
+    const QString systemLogSignature = QStringLiteral("%1|%2|%3|%4")
+        .arg(s.alarmLevel)
+        .arg(s.cloudConnected)
+        .arg(s.sensorOnline)
+        .arg(s.actuatorOnline);
+    if (systemLogSignature != m_lastSystemLogSignature) {
+        m_lastSystemLogSignature = systemLogSignature;
+        appendLogLine(
+            QStringLiteral("%1  系统  云端:%2  采集:%3  执行器:%4  状态:%5")
+                .arg(timeText)
+                .arg(cloudStateToText(s.cloudConnected))
+                .arg(onlineText(s.sensorOnline))
+                .arg(onlineText(s.actuatorOnline))
+                .arg(s.statusText.isEmpty() ? levelToText(s.alarmLevel) : s.statusText));
+    }
+
+    const QString voiceLogSignature = QStringLiteral("%1|%2|%3|%4")
+        .arg(assistantState, s.assistantUserText, s.assistantReply, s.assistantExecuteMessage);
+    if (voiceLogSignature != m_lastVoiceLogSignature
+        && (!s.assistantUserText.isEmpty()
+            || !s.assistantReply.isEmpty()
+            || !s.assistantExecuteMessage.isEmpty()
+            || s.voiceState != VOICE_IDLE)) {
+        m_lastVoiceLogSignature = voiceLogSignature;
+        QStringList parts;
+        parts << QStringLiteral("%1  语音  %2 / %3").arg(timeText, assistantState, provider);
+        if (!s.assistantUserText.isEmpty()) {
+            parts << QStringLiteral("问:%1").arg(s.assistantUserText.left(40));
+        }
+        if (!s.assistantReply.isEmpty()) {
+            parts << QStringLiteral("答:%1").arg(s.assistantReply.left(60));
+        }
+        if (!s.assistantExecuteMessage.isEmpty()) {
+            parts << QStringLiteral("执行:%1").arg(s.assistantExecuteMessage.left(50));
+        }
+        appendLogLine(parts.join(QStringLiteral("  ")));
+    }
+
+    const QString visionLogSignature = QStringLiteral("%1|%2|%3|%4")
+        .arg(s.visionStatus, s.visionBackend, s.visionSummary)
+        .arg(s.visionLatencyMs);
+    if (visionLogSignature != m_lastVisionLogSignature && !s.visionStatus.isEmpty()) {
+        m_lastVisionLogSignature = visionLogSignature;
+        appendLogLine(
+            QStringLiteral("%1  视觉  %2  后端:%3  延迟:%4ms  %5")
+                .arg(timeText)
+                .arg(ppeStatusText(s.visionStatus))
+                .arg(s.visionBackend.isEmpty() ? QStringLiteral("--") : s.visionBackend)
+                .arg(s.visionLatencyMs)
+                .arg(s.visionSummary.left(60)));
+    }
+
     updateVoiceAnimation();
 }
 
 void MainWindow::onAlarmLogged(const QString &line)
 {
-    if (m_alarmList) {
-        m_alarmList->addItem(line);
-        m_alarmList->scrollToBottom();
+    appendLogLine(QStringLiteral("报警  ") + line);
+}
+
+void MainWindow::appendLogLine(const QString &line)
+{
+    if (!m_alarmList || line.trimmed().isEmpty()) {
+        return;
     }
+    if (m_alarmList->count() == 1
+        && m_alarmList->item(0)->text() == QStringLiteral("系统日志已启动，等待事件。")) {
+        delete m_alarmList->takeItem(0);
+    }
+    m_alarmList->addItem(line);
+    while (m_alarmList->count() > 200) {
+        delete m_alarmList->takeItem(0);
+    }
+    m_alarmList->scrollToBottom();
 }
 
 void MainWindow::updateVoiceAnimation()
@@ -1227,6 +1294,8 @@ bool MainWindow::startVoiceAssistant()
     }
 
     setVoiceButtonRunning(true);
+    appendLogLine(QStringLiteral("%1  语音  助手已启动，进程日志: runtime/voice_assistant_process.log")
+                      .arg(QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss"))));
     if (m_bottomLabel) {
         m_bottomLabel->setText(QStringLiteral("语音助手已启动：正在监听麦克风。"));
     }
@@ -1266,14 +1335,21 @@ void MainWindow::onVoiceProcessFinished(int exitCode, int exitStatus)
     }
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {
         m_bottomLabel->setText(QStringLiteral("语音助手已退出。"));
+        appendLogLine(QStringLiteral("%1  语音  助手已退出")
+                          .arg(QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss"))));
     } else {
         m_bottomLabel->setText(QStringLiteral("语音助手已停止，退出码：%1").arg(exitCode));
+        appendLogLine(QStringLiteral("%1  语音  助手异常停止，退出码:%2")
+                          .arg(QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss")))
+                          .arg(exitCode));
     }
 }
 
 void MainWindow::onVoiceProcessError()
 {
     setVoiceButtonRunning(false);
+    appendLogLine(QStringLiteral("%1  语音  进程异常，请检查 Python、依赖和麦克风")
+                      .arg(QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss"))));
     if (m_bottomLabel) {
         m_bottomLabel->setText(QStringLiteral("语音助手进程异常，请检查 Python、依赖和麦克风。"));
     }

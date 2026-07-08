@@ -175,7 +175,7 @@ VOICE_WAKE_REQUIRED=true
 VOICE_WAKE_WORDS=小龙,你好小龙,龙芯助手,小龙在吗,在吗
 VOICE_WAKE_WINDOW_SECONDS=10
 VOICE_TTS_MODE=baidu
-VOICE_TTS_MAX_CHARS=120
+VOICE_TTS_MAX_CHARS=180
 ```
 
 连续监听时，说“你好小龙，介绍一下当前系统”会去掉唤醒词后进入 ASR/LLM 流程。只说“你好小龙”或“在吗”时，助手会播报“我在，请说”，并打开 `VOICE_WAKE_WINDOW_SECONDS` 秒唤醒窗口；窗口内下一句话无需重复唤醒词。每次回答完成后会继续延长同样的追问窗口，超过窗口时间未继续说话才结束对话。播报使用百度 TTS 生成 wav，再通过板端 `aplay` 播放。
@@ -376,6 +376,12 @@ AUDIO_DEVICE=plughw:1,0 python3 main.py --continuous
 - `MAX_RECORD_SECONDS`
 
 这些参数也支持同名环境变量，方便板端现场调试。
+
+### 说话或播报中途停止
+
+- 如果是“我还没说完，录音就结束”，通常是说话中间停顿被 VAD 当作静音。可增大 `END_SILENCE_SECONDS`，当前默认 `1.8` 秒；也可增大 `MAX_RECORD_SECONDS`，当前默认 `15` 秒。
+- 如果是“助手回答播报到一半就停”，通常是播报字符上限或 `aplay` 播放超时。当前 `VOICE_TTS_MAX_CHARS` 默认 `180`，百度 TTS 播放超时会随文本长度放宽。
+- Qt 启动的语音进程日志在仓库根目录的 `runtime/voice_assistant_process.log`，交互 JSON 日志在 `voice_llm_demo/logs/demo.log`。
 
 ### 百度 ASR 报错
 

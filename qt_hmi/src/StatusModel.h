@@ -45,6 +45,7 @@ private:
     IDataProvider *m_provider = nullptr;   // 不拥有所有权
     SystemStatus   m_current;
     QStringList    m_alarmLog;
+    QString        m_lastAlarmSignature;
 
     static const int kMaxLogLines = 200;   // 日志最大保留条数，防止无限增长
 };
