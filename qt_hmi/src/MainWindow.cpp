@@ -694,9 +694,22 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
     const QString models = s.modelSource.isEmpty() ? QStringLiteral("--") : s.modelSource;
     const QString source = s.sensorSource.isEmpty() ? QStringLiteral("2K0301") : s.sensorSource;
     const QString timeText = timestampText(s.timestamp);
-    const bool tempValid = s.sensorOnline && s.temperature > -900.0;
-    const bool humiValid = s.sensorOnline && s.humidity >= 0.0;
-    const int sensorDisplayLevel = s.sensorOnline ? LEVEL_NORMAL : LEVEL_ALARM;
+    const bool tempValid = s.temperature > -900.0;
+    const bool humiValid = s.humidity >= 0.0;
+    const bool tvocValid = s.sensorOnline || s.tvoc > 0.0 || s.eco2 >= 400.0;
+    const bool eco2Valid = s.sensorOnline || s.eco2 >= 400.0;
+    const bool mq3Valid = s.mq3Value >= 0.0;
+    const bool flameValid = true;
+    const bool riskValid = s.riskScore >= 0.0;
+    const int invalidSensorLevel = LEVEL_ALARM;
+    const QString collectionState = s.sensorOnline ? QStringLiteral("在线") : QStringLiteral("离线/降级");
+    const QString tempDisplay = tempValid ? temperatureText(s.temperature) : QStringLiteral("离线");
+    const QString humiDisplay = humiValid ? humidityText(s.humidity) : QStringLiteral("离线");
+    const QString tvocDisplay = tvocValid ? QStringLiteral("%1 ppb").arg(s.tvoc, 0, 'f', 0) : QStringLiteral("离线");
+    const QString eco2Display = eco2Valid ? QStringLiteral("%1 ppm").arg(s.eco2, 0, 'f', 0) : QStringLiteral("离线");
+    const QString mq3Display = mq3Valid ? QStringLiteral("%1 mg/L").arg(s.mq3Value, 0, 'f', 3) : QStringLiteral("离线");
+    const QString flameDisplay = flameValid ? flameStatusText(s.flameDetected) : QStringLiteral("离线");
+    const QString riskDisplay = riskValid ? QStringLiteral("%1 / 100").arg(s.riskScore, 0, 'f', 0) : QStringLiteral("离线");
 
     m_modelDetailsText = s.modelDetails;
     if (m_modelDetailsButton) {
@@ -717,17 +730,17 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
     }
     if (m_overviewSensorLabel) {
         m_overviewSensorLabel->setText(
-            QStringLiteral("设备：%1\n采集板：%2  执行器：%3  来源：%4  更新时间：%5\n温度：%6  湿度：%7  TVOC：%8 ppb  eCO2：%9 ppm  MQ-3：%10 mg/L")
+            QStringLiteral("设备：%1\n采集状态：%2  执行器：%3  来源：%4  更新时间：%5\n温度：%6  湿度：%7  TVOC：%8  eCO2：%9  MQ-3：%10")
                 .arg(s.deviceId.isEmpty() ? QStringLiteral("--") : s.deviceId)
-                .arg(onlineText(s.sensorOnline))
+                .arg(collectionState)
                 .arg(onlineText(s.actuatorOnline))
                 .arg(source)
                 .arg(timeText)
-                .arg(tempValid ? temperatureText(s.temperature) : QStringLiteral("离线"))
-                .arg(humiValid ? humidityText(s.humidity) : QStringLiteral("离线"))
-                .arg(s.tvoc, 0, 'f', 0)
-                .arg(s.eco2, 0, 'f', 0)
-                .arg(s.mq3Value, 0, 'f', 3));
+                .arg(tempDisplay)
+                .arg(humiDisplay)
+                .arg(tvocDisplay)
+                .arg(eco2Display)
+                .arg(mq3Display));
     }
     if (m_overviewCloudLabel) {
         m_overviewCloudLabel->setText(
@@ -740,8 +753,8 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
     }
 
     if (m_tempValue) {
-        m_tempValue->setText(tempValid ? temperatureText(s.temperature) : QStringLiteral("离线"));
-        const int level = tempValid ? levelFromHigh(s.temperature, 60.0, 75.0) : sensorDisplayLevel;
+        m_tempValue->setText(tempDisplay);
+        const int level = tempValid ? levelFromHigh(s.temperature, 60.0, 75.0) : invalidSensorLevel;
         if (m_tempCard) {
             applyLevelStyle(m_tempCard, m_tempValue, level);
         } else {
@@ -751,14 +764,14 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
     if (m_tempDetail) {
         m_tempDetail->setText(
             QStringLiteral("采集板：%1\n阈值：60 ℃预警 / 75 ℃报警\n原始值：%2  更新时间：%3")
-                .arg(onlineText(s.sensorOnline))
+                .arg(collectionState)
                 .arg(s.temperature, 0, 'f', 1)
                 .arg(timeText));
     }
 
     if (m_humiValue) {
-        m_humiValue->setText(humiValid ? humidityText(s.humidity) : QStringLiteral("离线"));
-        const int level = humiValid ? levelFromHumidity(s.humidity) : sensorDisplayLevel;
+        m_humiValue->setText(humiDisplay);
+        const int level = humiValid ? levelFromHumidity(s.humidity) : invalidSensorLevel;
         if (m_humiCard) {
             applyLevelStyle(m_humiCard, m_humiValue, level);
         } else {
@@ -768,14 +781,14 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
     if (m_humiDetail) {
         m_humiDetail->setText(
             QStringLiteral("采集板：%1\n阈值：20-80 %RH 预警，10-90 %RH 外报警\n原始值：%2  更新时间：%3")
-                .arg(onlineText(s.sensorOnline))
+                .arg(collectionState)
                 .arg(s.humidity, 0, 'f', 1)
                 .arg(timeText));
     }
 
     if (m_tvocValue) {
-        m_tvocValue->setText(s.sensorOnline ? QStringLiteral("%1 ppb").arg(s.tvoc, 0, 'f', 0) : QStringLiteral("离线"));
-        const int level = s.sensorOnline ? s.tvocLevel : sensorDisplayLevel;
+        m_tvocValue->setText(tvocDisplay);
+        const int level = tvocValid ? s.tvocLevel : invalidSensorLevel;
         if (m_tvocCard) {
             applyLevelStyle(m_tvocCard, m_tvocValue, level);
         } else {
@@ -783,12 +796,12 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
         }
     }
     if (m_tvocDetail) {
-        m_tvocDetail->setText(QStringLiteral("总挥发性有机物。采集板：%1\n当前原始值：%2 ppb").arg(onlineText(s.sensorOnline)).arg(s.tvoc, 0, 'f', 0));
+        m_tvocDetail->setText(QStringLiteral("总挥发性有机物。采集状态：%1\n当前原始值：%2 ppb").arg(collectionState).arg(s.tvoc, 0, 'f', 0));
     }
 
     if (m_eco2Value) {
-        m_eco2Value->setText(s.sensorOnline ? QStringLiteral("%1 ppm").arg(s.eco2, 0, 'f', 0) : QStringLiteral("离线"));
-        const int level = s.sensorOnline ? s.eco2Level : sensorDisplayLevel;
+        m_eco2Value->setText(eco2Display);
+        const int level = eco2Valid ? s.eco2Level : invalidSensorLevel;
         if (m_eco2Card) {
             applyLevelStyle(m_eco2Card, m_eco2Value, level);
         } else {
@@ -796,12 +809,12 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
         }
     }
     if (m_eco2Detail) {
-        m_eco2Detail->setText(QStringLiteral("等效二氧化碳浓度。采集板：%1\n当前原始值：%2 ppm").arg(onlineText(s.sensorOnline)).arg(s.eco2, 0, 'f', 0));
+        m_eco2Detail->setText(QStringLiteral("等效二氧化碳浓度。采集状态：%1\n当前原始值：%2 ppm").arg(collectionState).arg(s.eco2, 0, 'f', 0));
     }
 
     if (m_mq3Value) {
-        m_mq3Value->setText(s.sensorOnline ? QStringLiteral("%1 mg/L").arg(s.mq3Value, 0, 'f', 3) : QStringLiteral("离线"));
-        const int level = s.sensorOnline ? s.mq3Level : sensorDisplayLevel;
+        m_mq3Value->setText(mq3Display);
+        const int level = mq3Valid ? s.mq3Level : invalidSensorLevel;
         if (m_mq3Card) {
             applyLevelStyle(m_mq3Card, m_mq3Value, level);
         } else {
@@ -809,12 +822,12 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
         }
     }
     if (m_mq3Detail) {
-        m_mq3Detail->setText(QStringLiteral("MQ-3 乙醇浓度。采集板：%1\n当前原始值：%2 mg/L").arg(onlineText(s.sensorOnline)).arg(s.mq3Value, 0, 'f', 3));
+        m_mq3Detail->setText(QStringLiteral("MQ-3 乙醇浓度。采集状态：%1\n当前原始值：%2 mg/L").arg(collectionState).arg(s.mq3Value, 0, 'f', 3));
     }
 
     if (m_flameValue) {
-        m_flameValue->setText(s.sensorOnline ? flameStatusText(s.flameDetected) : QStringLiteral("离线"));
-        const int level = s.sensorOnline ? s.flameLevel : sensorDisplayLevel;
+        m_flameValue->setText(flameDisplay);
+        const int level = flameValid ? s.flameLevel : invalidSensorLevel;
         if (m_flameCard) {
             applyLevelStyle(m_flameCard, m_flameValue, level);
         } else {
@@ -822,12 +835,12 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
         }
     }
     if (m_flameDetail) {
-        m_flameDetail->setText(QStringLiteral("火焰传感器状态：%1\n采集板：%2").arg(flameStatusText(s.flameDetected), onlineText(s.sensorOnline)));
+        m_flameDetail->setText(QStringLiteral("火焰传感器状态：%1\n采集状态：%2").arg(flameStatusText(s.flameDetected), collectionState));
     }
 
     if (m_riskValue) {
-        m_riskValue->setText(s.sensorOnline ? QStringLiteral("%1 / 100").arg(s.riskScore, 0, 'f', 0) : QStringLiteral("离线"));
-        const int level = s.sensorOnline ? s.riskLevel : sensorDisplayLevel;
+        m_riskValue->setText(riskDisplay);
+        const int level = riskValid ? s.riskLevel : invalidSensorLevel;
         if (m_riskCard) {
             applyLevelStyle(m_riskCard, m_riskValue, level);
         } else {
@@ -835,13 +848,13 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
         }
     }
     if (m_riskDetail) {
-        m_riskDetail->setText(QStringLiteral("301 综合风险指数。采集板：%1\n当前原始值：%2/100").arg(onlineText(s.sensorOnline)).arg(s.riskScore, 0, 'f', 0));
+        m_riskDetail->setText(QStringLiteral("301 综合风险指数。采集状态：%1\n当前原始值：%2/100").arg(collectionState).arg(s.riskScore, 0, 'f', 0));
     }
 
     if (m_metricsNoteLabel) {
         m_metricsNoteLabel->setText(
-            QStringLiteral("2K0301：%1  执行器：%2  来源：%3  更新时间：%4  原始温湿度：%5 / %6")
-                .arg(onlineText(s.sensorOnline))
+            QStringLiteral("2K0301采集：%1  执行器：%2  来源：%3  更新时间：%4  原始温湿度：%5 / %6")
+                .arg(collectionState)
                 .arg(onlineText(s.actuatorOnline))
                 .arg(source)
                 .arg(timeText)
