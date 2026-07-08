@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-07-07，真实链路已跑通：
+截至 2026-07-08，真实链路已跑通：
 
 ```text
 2K0301 真实传感器程序
@@ -49,7 +49,7 @@
 - Windows SafeCloud：`http://192.168.43.5:8010`
 - SafeCloud UDP discovery：`8011`
 - 2K1000LA Mosquitto：`0.0.0.0:1883`
-- 301 主程序：`/root/xylt_301_main_nopaho`
+- 301 主程序：`/home/root/main`，由 `xylt-301-main.service` 托管
 - 2K1000LA 真实响应输出样例：`runtime/latest_evaluate_response.json`
 - Qt HMI 文件数据源：`qt_hmi/build_qmake/display_qt_app --status-file runtime/latest_evaluate_response.json`
 - SafeCloud 控制入口：`POST /api/commands`，启用 MQTT 后直接下发到 301 并返回 ACK。
@@ -135,13 +135,13 @@ env PYTHONUNBUFFERED=1 PYTHONPATH=. python3 app_2k1000la/cloud_client.py \
 ### 301 手动运行主程序
 
 ```bash
-/root/xylt_301_main_nopaho
+/home/root/main
 ```
 
 短时测试可用：
 
 ```bash
-timeout -s INT 12 /root/xylt_301_main_nopaho
+timeout -s INT 12 /home/root/main
 ```
 
 ### 2K1000LA 抓 MQTT
@@ -269,7 +269,7 @@ PYTHONPATH=. python3 voice_llm_demo/main.py \
 
 1. **301 传感器提示**：运行时偶发 `SGP30 写入湿度补偿失败`、`ADC_CH0 timeout`、`I2C 写入 3 字节失败`，但主程序会继续上报 MQTT 数据。
 2. **旧轮询进程干扰**：首次稳定性测试发现板端残留 `gas_alarm.json` 轮询进程会覆盖输出文件；已停止旧用户服务并清理残留进程。
-3. **systemd 暂缓启用**：当前阶段手动联调更直观，正式开机自启动放到最后统一编排。
+3. **systemd 已启用**：2K1000LA 和 301 均已部署开机自启动。后续手动调试前应先 `systemctl stop` 对应服务，避免重复进程。
 4. **301 稳定性仍需复测**：首次脏环境测试期间 301 曾重启一次；清理旧进程后的 5 分钟测试未复现。
 5. **301 残留进程会干扰 ACK**：若 301 上残留多个 `xylt_301_main_nopaho` 进程，需清理到只保留一个实例。BusyBox `ps` 下可用 `ps | grep '[x]ylt_301_main_nopaho'` 检查。
 6. **中文命令通过 SSH here-doc 可能乱码**：远程自动测试语音时可用 Unicode 转义，实际终端交互或 ASR 返回正常 UTF-8 文本即可。
@@ -278,7 +278,7 @@ PYTHONPATH=. python3 voice_llm_demo/main.py \
 
 测试时间：2026-07-07 约 19:00。
 
-- 301：`/root/xylt_301_main_nopaho` 连续运行到 `timeout -s INT` 正常退出，累计报警次数为 0。
+- 301：`/home/root/main` 已切换到 `xylt-301-main.service` 常驻运行。
 - 2K1000LA：`cloud_client.py --sensor-source 2k0301 --loop --interval 2` 自然结束。
 - SafeCloud：持续返回 `debug.client.ok=true`，最终 `base_url=http://192.168.43.5:8010`。
 - 结果数量：2K1000LA 日志中共出现 155 条 `evaluate_result`。
@@ -315,9 +315,9 @@ PYTHONPATH=. python3 voice_llm_demo/main.py \
 - 语音 demo 已增加 `--mqtt-control`、`--mqtt-host`、`--manual-text`。
 - `打开风扇`、`打开蜂鸣器`、`红灯闪烁` 已在 2K1000LA 上走完整控制闭环。
 
-### P5 最后做开机自启动
+### P5 开机自启动（已完成）
 
-- 固化 `mosquitto`。
-- 固化 `cloud_client.py --loop`。
-- 固化 Qt HMI。
-- 根据比赛现场网络保留 SafeCloud 自动发现或手动 `SAFECLOUD_BASE_URL`。
+- 2K1000LA 已启用 `mosquitto.service`、`xylt-cloud-client.service`、`xylt-vision.service`、`xylt-hmi.service`。
+- 301 已启用 `xylt-301-main.service`，运行 `/home/root/main`。
+- 当前 SafeCloud 地址通过 `/etc/xylt/2k1000la.env` 的 `SAFECLOUD_BASE_URL=http://192.168.43.5:8010` 固定；换网络后修改该文件并重启 2K1000LA 相关服务。
+- 详细命令见 `docs/deployment/BOOT_AUTOSTART.md`。

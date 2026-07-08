@@ -1,0 +1,27 @@
+[Unit]
+Description=XYLT 2K1000LA vision service
+After=network-online.target xylt-cloud-client.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xylt
+Group=xylt
+WorkingDirectory=@REPO_ROOT@
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=@REPO_ROOT@
+Environment=SAFECLOUD_BASE_URL=http://192.168.43.5:8010
+Environment=XYLT_CAMERA_INDEX=0
+Environment=XYLT_VISION_MODE=cloud
+Environment=XYLT_VISION_OUTPUT_DIR=runtime/vision
+Environment=XYLT_VISION_LIVE_FILE=runtime/vision/live.jpg
+Environment=XYLT_VISION_CAPTURE_REQUEST=runtime/vision/capture_request.json
+Environment=XYLT_ARCHIVE_DIR=/media/xylt/0403-0201/xylt_vision_archive
+EnvironmentFile=-/etc/xylt/2k1000la.env
+ExecStart=/usr/bin/python3 @REPO_ROOT@/app_2k1000la/vision_service.py --base-url ${SAFECLOUD_BASE_URL} --camera-index ${XYLT_CAMERA_INDEX} --mode ${XYLT_VISION_MODE} --follow-cloud-mode --output-dir ${XYLT_VISION_OUTPUT_DIR} --live-image-file ${XYLT_VISION_LIVE_FILE} --archive-dir ${XYLT_ARCHIVE_DIR} --periodic-upload-seconds 300 --capture-request-file ${XYLT_VISION_CAPTURE_REQUEST} --width 480 --height 270 --jpeg-quality 58 --preview-interval 0.8 --preview-jpeg-quality 45 --loop --interval 0.2 --include-debug --timeout 80
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

@@ -1227,6 +1227,7 @@ bool MainWindow::startVoiceAssistant()
     if (!m_voiceProcess || m_voiceProcess->state() != QProcess::NotRunning) {
         return true;
     }
+    m_voiceManualStop = false;
 
     const QString root = repoRootPath();
     QDir rootDir(root);
@@ -1318,6 +1319,7 @@ bool MainWindow::startVoiceAssistant()
 
 void MainWindow::stopVoiceAssistant()
 {
+    m_voiceManualStop = true;
     if (!m_voiceProcess || m_voiceProcess->state() == QProcess::NotRunning) {
         setVoiceButtonRunning(false);
         return;
@@ -1344,18 +1346,31 @@ void MainWindow::setVoiceButtonRunning(bool running)
 void MainWindow::onVoiceProcessFinished(int exitCode, int exitStatus)
 {
     setVoiceButtonRunning(false);
-    if (!m_bottomLabel) {
-        return;
-    }
+    const bool shouldRestart = !m_voiceManualStop && envFlagEnabled("VOICE_AUTORESTART", true);
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {
-        m_bottomLabel->setText(QStringLiteral("语音助手已退出。"));
+        if (m_bottomLabel) {
+            m_bottomLabel->setText(shouldRestart ? QStringLiteral("语音助手已退出，准备自动重启。")
+                                                 : QStringLiteral("语音助手已退出。"));
+        }
         appendLogLine(QStringLiteral("%1  语音  助手已退出")
                           .arg(QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss"))));
     } else {
-        m_bottomLabel->setText(QStringLiteral("语音助手已停止，退出码：%1").arg(exitCode));
+        if (m_bottomLabel) {
+            m_bottomLabel->setText(shouldRestart ? QStringLiteral("语音助手异常停止，准备自动重启，退出码：%1").arg(exitCode)
+                                                 : QStringLiteral("语音助手已停止，退出码：%1").arg(exitCode));
+        }
         appendLogLine(QStringLiteral("%1  语音  助手异常停止，退出码:%2")
                           .arg(QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss")))
                           .arg(exitCode));
+    }
+    if (shouldRestart) {
+        QTimer::singleShot(3000, this, [this]() {
+            if (!m_voiceManualStop && m_voiceProcess && m_voiceProcess->state() == QProcess::NotRunning) {
+                appendLogLine(QStringLiteral("%1  语音  助手自动重启")
+                                  .arg(QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss"))));
+                startVoiceAssistant();
+            }
+        });
     }
 }
 

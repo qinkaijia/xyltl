@@ -1,0 +1,27 @@
+[Unit]
+Description=XYLT 2K1000LA Qt HMI and voice assistant
+After=graphical.target xylt-cloud-client.service xylt-vision.service
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=xylt
+Group=xylt
+WorkingDirectory=@REPO_ROOT@
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/xylt/.Xauthority
+Environment=QT_QPA_PLATFORM=xcb
+Environment=XYLT_REPO_ROOT=@REPO_ROOT@
+Environment=VOICE_AUTOSTART=true
+Environment=VOICE_AUTORESTART=true
+Environment=VOICE_WAKE_REQUIRED=true
+Environment=VOICE_TTS_MODE=baidu
+Environment=XYLT_HMI_GEOMETRY=780x450+10+10
+EnvironmentFile=-/etc/xylt/2k1000la.env
+ExecStart=@REPO_ROOT@/qt_hmi/build_qmake/display_qt_app --compact --geometry ${XYLT_HMI_GEOMETRY} --status-file @REPO_ROOT@/runtime/latest_evaluate_response.json --voice-file @REPO_ROOT@/runtime/voice_assistant_state.json --vision-file @REPO_ROOT@/runtime/vision/vision_state.json --vision-live-file @REPO_ROOT@/runtime/vision/live.jpg
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+
+[Install]
+WantedBy=graphical.target

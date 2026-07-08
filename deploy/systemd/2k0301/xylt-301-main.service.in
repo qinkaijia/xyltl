@@ -1,0 +1,17 @@
+[Unit]
+Description=XYLT 2K0301 sensor acquisition and actuator bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@APP_DIR@
+ExecStart=@APP_BIN@
+Restart=always
+RestartSec=3
+KillSignal=SIGINT
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

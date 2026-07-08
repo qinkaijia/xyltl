@@ -1,0 +1,29 @@
+[Unit]
+Description=XYLT 2K1000LA SafeCloud bridge
+After=network-online.target mosquitto.service
+Wants=network-online.target mosquitto.service
+
+[Service]
+Type=simple
+User=xylt
+Group=xylt
+WorkingDirectory=@REPO_ROOT@
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=@REPO_ROOT@
+Environment=SAFECLOUD_BASE_URL=http://192.168.43.5:8010
+Environment=XYLT_SENSOR_SOURCE=2k0301
+Environment=XYLT_2K0301_MQTT_HOST=127.0.0.1
+Environment=XYLT_2K0301_MQTT_PORT=1883
+Environment=XYLT_OUTPUT_FILE=runtime/latest_evaluate_response.json
+Environment=XYLT_TIMEOUT=20
+Environment=XYLT_INTERVAL=2
+Environment=XYLT_TTS_MODE=baidu
+Environment=XYLT_ALERT_COOLDOWN_SECONDS=30
+EnvironmentFile=-/etc/xylt/2k1000la.env
+ExecStart=/usr/bin/python3 @REPO_ROOT@/app_2k1000la/cloud_client.py --base-url ${SAFECLOUD_BASE_URL} --sensor-source ${XYLT_SENSOR_SOURCE} --mqtt-host ${XYLT_2K0301_MQTT_HOST} --mqtt-port ${XYLT_2K0301_MQTT_PORT} --output-file ${XYLT_OUTPUT_FILE} --include-debug --loop --interval ${XYLT_INTERVAL} --timeout ${XYLT_TIMEOUT} --speak-on-alert --tts-mode ${XYLT_TTS_MODE} --alert-cooldown-seconds ${XYLT_ALERT_COOLDOWN_SECONDS}
+Restart=always
+RestartSec=3
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

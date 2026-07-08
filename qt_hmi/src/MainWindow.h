@@ -102,6 +102,7 @@ private:
     QTimer *m_voiceAnimationTimer = nullptr;
     int m_voiceAnimationFrame = 0;
     int m_lastVoiceState = VOICE_IDLE;
+    bool m_voiceManualStop = false;
     QDateTime m_lastVisionTimestamp;
     QDateTime m_showVisionKeyframeUntil;
 };
