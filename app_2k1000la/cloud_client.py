@@ -5,6 +5,7 @@ import json
 import os
 import socket
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -336,12 +337,20 @@ def alert_signature(status: Dict[str, Any]) -> str:
 
 
 class VoiceAlertManager:
-    def __init__(self, enabled: bool, tts_mode: str = "", cooldown_seconds: float = 30.0) -> None:
+    def __init__(
+        self,
+        enabled: bool,
+        tts_mode: str = "",
+        cooldown_seconds: float = 30.0,
+        async_speech: bool = False,
+    ) -> None:
         self.enabled = enabled
         self.tts_mode = tts_mode
         self.cooldown_seconds = max(0.0, cooldown_seconds)
+        self.async_speech = async_speech
         self.last_signature = ""
         self.last_spoken_at = 0.0
+        self._speak_thread: Optional[threading.Thread] = None
 
     def maybe_speak(self, response: Dict[str, Any], now: Optional[float] = None) -> bool:
         if not self.enabled:
@@ -362,10 +371,32 @@ class VoiceAlertManager:
         if not should_speak:
             return False
 
-        spoken = speak_response(response, self.tts_mode)
+        if self.async_speech:
+            spoken = self._start_async_speech(response)
+        else:
+            spoken = speak_response(response, self.tts_mode)
+
+        if not spoken:
+            return False
+
         self.last_signature = signature
         self.last_spoken_at = current_time
         return spoken
+
+    def _start_async_speech(self, response: Dict[str, Any]) -> bool:
+        if self._speak_thread and self._speak_thread.is_alive():
+            print("[voice] previous alert speech is still running, skip this alert speech")
+            return False
+
+        def worker() -> None:
+            try:
+                speak_response(response, self.tts_mode)
+            except Exception as exc:  # pragma: no cover - defensive guard for device-only TTS failures.
+                print(f"语音播报失败：{exc}")
+
+        self._speak_thread = threading.Thread(target=worker, name="xylt-alert-tts", daemon=True)
+        self._speak_thread.start()
+        return True
 
 
 def run_once(
@@ -467,7 +498,12 @@ def main() -> None:
     )
     print(f"safecloud_base_url={base_url} source={source}")
     client = SafeCloudClient(base_url, args.timeout)
-    alert_manager = VoiceAlertManager(args.speak_on_alert, args.tts_mode, args.alert_cooldown_seconds)
+    alert_manager = VoiceAlertManager(
+        args.speak_on_alert,
+        args.tts_mode,
+        args.alert_cooldown_seconds,
+        async_speech=True,
+    )
 
     while True:
         try:
