@@ -30,7 +30,7 @@ DEFAULT_LIVE_IMAGE_FILE = DEFAULT_OUTPUT_DIR / "live.jpg"
 DEFAULT_ARCHIVE_DIR = Path("/media/xylt/0403-0201/xylt_vision_archive")
 DEFAULT_PERIODIC_UPLOAD_SECONDS = 300.0
 DEFAULT_TRIGGER_MIN_INTERVAL_SECONDS = 30.0
-DEFAULT_PREVIEW_INTERVAL_SECONDS = 0.5
+DEFAULT_PREVIEW_INTERVAL_SECONDS = 0.8
 DEFAULT_ARCHIVE_MAX_AGE_DAYS = 7.0
 DEFAULT_ARCHIVE_MAX_BYTES = 1_073_741_824
 DEFAULT_LOCAL_VISION_DIRS = [
@@ -102,6 +102,11 @@ def read_capture_request(path: Path) -> dict[str, Any] | None:
         "force": bool(data.get("force")),
         "created_at": str(data.get("created_at") or ""),
     }
+
+
+def initial_capture_request_id(path: Path) -> str:
+    request = read_capture_request(path)
+    return str(request["request_id"]) if request else ""
 
 
 def sanitize_name_part(value: str, default: str = "capture") -> str:
@@ -260,9 +265,9 @@ class VisionLoop:
         self.archive_dir = Path(args.archive_dir)
         self.camera = CameraSource(args.camera_index, args.width, args.height, args.test_image)
         self.local_runner = LocalYoloRunner(args.local_vision_dir)
-        self.last_request_id = ""
+        self.last_request_id = initial_capture_request_id(self.capture_request_file)
         self.last_capture_monotonic = 0.0
-        self.next_periodic_at = 0.0
+        self.next_periodic_at = time.monotonic() + max(0.0, float(args.periodic_upload_seconds))
         self.last_state: dict[str, Any] | None = None
         self.last_preview_monotonic = 0.0
         self.analysis_thread: threading.Thread | None = None
@@ -377,6 +382,7 @@ class VisionLoop:
     def start_analysis(self, trigger: str, request_id: str, question: str = "") -> bool:
         if self.analysis_thread is not None and self.analysis_thread.is_alive():
             return False
+        self.write_processing_state(trigger=trigger, request_id=request_id, question=question)
         self.analysis_thread = threading.Thread(
             target=self._analysis_worker,
             args=(trigger, request_id, question),
@@ -384,6 +390,38 @@ class VisionLoop:
         )
         self.analysis_thread.start()
         return True
+
+    def write_processing_state(self, trigger: str, request_id: str, question: str = "") -> None:
+        state = {
+            "vision_status": {
+                "device_id": "board_2k1000la",
+                "timestamp": now_text(),
+                "mode": self.current_mode(),
+                "trigger": trigger,
+                "request_id": request_id,
+                "backend": "pending",
+                "camera_online": True,
+                "person_detected": None,
+                "helmet_detected": None,
+                "mask_detected": None,
+                "reflective_vest_detected": None,
+                "fire_detected": None,
+                "ppe_status": "processing",
+                "missing_ppe": [],
+                "summary": "已收到拍照检测请求，正在抓拍并调用视觉模型。",
+                "confidence": 0.0,
+                "detections": [],
+                "latency_ms": 0,
+                "image_available": False,
+                "image_path": "",
+                "live_image_path": str(self.live_image_path if self.live_image_path.exists() else ""),
+                "error": "",
+            }
+        }
+        if question:
+            state["vision_status"]["capture_question"] = question
+        write_json_atomic(self.state_path, state)
+        self.last_state = state
 
     def _analysis_worker(self, trigger: str, request_id: str, question: str) -> None:
         state = self.run_once(trigger=trigger, request_id=request_id, question=question)
@@ -670,9 +708,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=float, default=45.0)
     parser.add_argument("--camera-index", type=int, default=0)
     parser.add_argument("--test-image", default="", help="Use an image file instead of USB camera for smoke tests.")
-    parser.add_argument("--width", type=int, default=640)
-    parser.add_argument("--height", type=int, default=360)
-    parser.add_argument("--jpeg-quality", type=int, default=72)
+    parser.add_argument("--width", type=int, default=480)
+    parser.add_argument("--height", type=int, default=270)
+    parser.add_argument("--jpeg-quality", type=int, default=58)
     parser.add_argument("--mode", default=os.environ.get("XYLT_VISION_MODE", "cloud"), choices=["cloud", "local", "off"])
     parser.add_argument("--mode-file", default=str(DEFAULT_MODE_FILE))
     parser.add_argument("--follow-cloud-mode", action="store_true")
@@ -688,8 +726,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--periodic-upload-seconds", type=float, default=DEFAULT_PERIODIC_UPLOAD_SECONDS)
     parser.add_argument("--trigger-min-interval-seconds", type=float, default=DEFAULT_TRIGGER_MIN_INTERVAL_SECONDS)
     parser.add_argument("--preview-interval", type=float, default=DEFAULT_PREVIEW_INTERVAL_SECONDS)
-    parser.add_argument("--preview-jpeg-quality", type=int, default=55)
-    parser.add_argument("--interval", type=float, default=1.0, help="Loop polling interval in seconds.")
+    parser.add_argument("--preview-jpeg-quality", type=int, default=45)
+    parser.add_argument("--interval", type=float, default=0.2, help="Loop polling interval in seconds.")
     parser.add_argument("--loop", action="store_true")
     parser.add_argument("--include-debug", action="store_true")
     return parser.parse_args()

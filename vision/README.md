@@ -26,9 +26,13 @@ python3 app_2k1000la/vision_service.py \
   --periodic-upload-seconds 300 \
   --capture-request-file runtime/vision/capture_request.json \
   --archive-dir /media/xylt/0403-0201/xylt_vision_archive \
-  --preview-interval 0.5 \
+  --width 480 \
+  --height 270 \
+  --jpeg-quality 58 \
+  --preview-interval 0.8 \
+  --preview-jpeg-quality 45 \
   --loop \
-  --interval 0.5 \
+  --interval 0.2 \
   --include-debug
 ```
 

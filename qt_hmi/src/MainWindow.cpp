@@ -113,6 +113,9 @@ static QString ppeStatusText(const QString &status)
     if (status == QStringLiteral("error")) {
         return QStringLiteral("视觉异常");
     }
+    if (status == QStringLiteral("processing")) {
+        return QStringLiteral("检测中");
+    }
     return QStringLiteral("等待识别");
 }
 
@@ -121,7 +124,7 @@ static int ppeStatusLevel(const QString &status)
     if (status == QStringLiteral("fail") || status == QStringLiteral("error")) {
         return LEVEL_ALARM;
     }
-    if (status == QStringLiteral("unknown")) {
+    if (status == QStringLiteral("unknown") || status == QStringLiteral("processing")) {
         return LEVEL_WARNING;
     }
     return LEVEL_NORMAL;

@@ -10,7 +10,7 @@
 #include <QStringList>
 #include <QTimer>
 
-static const int kPollIntervalMs = 1000;
+static const int kPollIntervalMs = 500;
 
 static QString valueText(const QJsonObject &obj, const QString &key, const QString &fallback = QStringLiteral("--"))
 {

@@ -282,6 +282,7 @@ function ppeStatusLabel(status) {
     pass: "防护合规",
     fail: "防护缺失",
     unknown: "等待识别",
+    processing: "检测中",
     error: "视觉异常",
   };
   return labels[status] || "等待识别";
@@ -289,7 +290,7 @@ function ppeStatusLabel(status) {
 
 function ppeStatusClass(status) {
   if (status === "fail" || status === "error") return "critical";
-  if (status === "unknown") return "warning";
+  if (status === "unknown" || status === "processing") return "warning";
   return "normal";
 }
 

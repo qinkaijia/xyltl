@@ -1,7 +1,13 @@
 import time
 from pathlib import Path
 
-from app_2k1000la.vision_service import archive_capture, normalize_local_yolo_result, read_capture_request, read_mode_file
+from app_2k1000la.vision_service import (
+    archive_capture,
+    initial_capture_request_id,
+    normalize_local_yolo_result,
+    read_capture_request,
+    read_mode_file,
+)
 
 
 def test_normalize_local_yolo_result_maps_ppe_fields(tmp_path: Path):
@@ -51,6 +57,13 @@ def test_read_capture_request_normalizes_request(tmp_path: Path):
     assert request["request_id"] == "req-1"
     assert request["trigger"] == "voice"
     assert request["force"] is True
+
+
+def test_initial_capture_request_id_skips_stale_request_on_restart(tmp_path: Path):
+    request_file = tmp_path / "capture_request.json"
+    request_file.write_text('{"request_id":"old-req","trigger":"qt_manual"}', encoding="utf-8")
+
+    assert initial_capture_request_id(request_file) == "old-req"
 
 
 def test_archive_capture_writes_files_and_prunes_old(tmp_path: Path):
