@@ -189,6 +189,8 @@ export LOONGSON_SAFETY_VISION_DIR=$HOME/loongson-safety-vision
 python3 app_2k1000la/vision_service.py --mode local --loop
 ```
 
+Qt HMI 写入的 `runtime/vision/mode_request.json` 优先级高于 SafeCloud `/api/vision/mode`，因此点击“本地”后板端会真正进入 `local`。本地模式必须能找到 `safety_check.py`、`yolo_detect`、`best320_opt.param`、`best320_opt.bin`；默认候选目录是 `$HOME/xylt/loongson-safety-vision` 和 `$HOME/xylt/vision/loongson-safety-vision`，也可以用 `LOONGSON_SAFETY_VISION_DIR` 指定。文件缺失时，Qt/日志会显示“本地 YOLO 推理失败”。
+
 视觉服务会写出：
 
 - `runtime/vision/live.jpg`：实时预览帧，Qt 视觉页默认显示。

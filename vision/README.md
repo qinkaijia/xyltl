@@ -57,6 +57,8 @@ python3 app_2k1000la/vision_service.py \
   --interval 5
 ```
 
+Qt HMI 的“本地/云端/关闭”按钮会写入板端 `runtime/vision/mode_request.json`，该文件优先级高于 SafeCloud `/api/vision/mode`。如果本地模式进入后立即报错，先核对板端是否存在 `loongson-safety-vision` 及其 `safety_check.py`、`yolo_detect`、`best320_opt.param`、`best320_opt.bin`。
+
 如果需要从网页切换模式，板端视觉服务启动时加：
 
 ```bash

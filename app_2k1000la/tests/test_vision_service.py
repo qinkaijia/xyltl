@@ -7,6 +7,7 @@ from app_2k1000la.vision_service import (
     normalize_local_yolo_result,
     read_capture_request,
     read_mode_file,
+    VisionLoop,
 )
 
 
@@ -42,6 +43,36 @@ def test_read_mode_file_uses_valid_mode_only(tmp_path: Path):
 
     mode_file.write_text('{"mode":"bad"}', encoding="utf-8")
     assert read_mode_file(mode_file, "cloud") == "cloud"
+
+
+def test_current_mode_prefers_board_local_request(tmp_path: Path, monkeypatch):
+    mode_file = tmp_path / "mode_request.json"
+    mode_file.write_text('{"mode":"local"}', encoding="utf-8")
+    args = type(
+        "Args",
+        (),
+        {
+            "output_dir": str(tmp_path),
+            "live_image_file": str(tmp_path / "live.jpg"),
+            "mode_file": str(mode_file),
+            "capture_request_file": str(tmp_path / "capture_request.json"),
+            "archive_dir": str(tmp_path / "archive"),
+            "camera_index": 0,
+            "width": 320,
+            "height": 180,
+            "test_image": "",
+            "local_vision_dir": "",
+            "mode": "cloud",
+            "follow_cloud_mode": True,
+            "timeout": 1.0,
+            "periodic_upload_seconds": 300.0,
+        },
+    )()
+    monkeypatch.setattr("app_2k1000la.vision_service.fetch_cloud_mode", lambda *args: "cloud")
+
+    loop = VisionLoop(args, "http://safecloud.local")
+
+    assert loop.current_mode() == "local"
 
 
 def test_read_capture_request_normalizes_request(tmp_path: Path):

@@ -167,6 +167,7 @@ def error_status(
     elapsed_ms: int = 0,
     trigger: str = "manual",
     request_id: str = "",
+    camera_online: bool = False,
 ) -> dict[str, Any]:
     return {
         "vision_status": {
@@ -176,7 +177,7 @@ def error_status(
             "trigger": trigger,
             "request_id": request_id,
             "backend": backend,
-            "camera_online": False,
+            "camera_online": camera_online,
             "person_detected": False,
             "helmet_detected": None,
             "mask_detected": None,
@@ -434,9 +435,11 @@ class VisionLoop:
 
     def current_mode(self) -> str:
         mode = self.args.mode
-        mode = read_mode_file(self.mode_file, mode)
         if self.args.follow_cloud_mode:
             mode = fetch_cloud_mode(self.base_url, self.args.timeout, mode)
+        # Board-local mode requests come from Qt and must win over the cloud
+        # default; otherwise the Qt "local" button can be silently overridden.
+        mode = read_mode_file(self.mode_file, mode)
         return mode if mode in {"cloud", "local", "off"} else "cloud"
 
     def evaluate_cloud(self, image_bytes: bytes, started: float, trigger: str, request_id: str, question: str = "") -> dict[str, Any]:
@@ -471,6 +474,7 @@ class VisionLoop:
                 elapsed_ms=int((time.time() - started) * 1000),
                 trigger=trigger,
                 request_id=request_id,
+                camera_online=True,
             )
 
     def write_state(self, state: dict[str, Any]) -> None:
@@ -563,6 +567,7 @@ class LocalYoloRunner:
                 elapsed_ms=int((time.time() - started) * 1000),
                 trigger=trigger,
                 request_id=request_id,
+                camera_online=True,
             )
 
     def _load_module(self) -> Any:
