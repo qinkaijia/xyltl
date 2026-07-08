@@ -185,6 +185,7 @@ env PYTHONUNBUFFERED=1 PYTHONPATH=. python3 app_2k1000la/vision_service.py \
 本地 YOLO 兜底模式需要先准备 `loongson-safety-vision`：
 
 ```bash
+git submodule update --init --recursive loongson-safety-vision
 export LOONGSON_SAFETY_VISION_DIR=$HOME/loongson-safety-vision
 python3 app_2k1000la/vision_service.py --mode local --loop
 ```

@@ -486,7 +486,7 @@ QWidget *MainWindow::createCameraPage()
     QVBoxLayout *imageLayout = new QVBoxLayout(imagePanel);
     imageLayout->setContentsMargins(m_compactMode ? 8 : 12, m_compactMode ? 8 : 12,
                                     m_compactMode ? 8 : 12, m_compactMode ? 8 : 12);
-    QLabel *imageTitle = new QLabel(QStringLiteral("USB 摄像头实时画面 / 检测关键帧"));
+    QLabel *imageTitle = new QLabel(QStringLiteral("USB 摄像头 / 检测关键帧"));
     imageTitle->setStyleSheet(
         QStringLiteral("color:%1; font-size:%2px; font-weight:800; background:transparent;")
             .arg(kMutedColor)
@@ -494,7 +494,8 @@ QWidget *MainWindow::createCameraPage()
     imageLayout->addWidget(imageTitle);
 
     m_visionImageLabel = new QLabel(QStringLiteral("等待摄像头画面"));
-    m_visionImageLabel->setMinimumSize(m_compactMode ? QSize(300, 190) : QSize(520, 320));
+    m_visionImageLabel->setMinimumSize(m_compactMode ? QSize(230, 150) : QSize(460, 280));
+    m_visionImageLabel->setMaximumHeight(m_compactMode ? 250 : 420);
     m_visionImageLabel->setAlignment(Qt::AlignCenter);
     m_visionImageLabel->setScaledContents(false);
     m_visionImageLabel->setStyleSheet(
@@ -503,13 +504,13 @@ QWidget *MainWindow::createCameraPage()
     imageLayout->addWidget(m_visionImageLabel, 1);
 
     QFrame *statusPanel = new QFrame;
-    statusPanel->setMinimumWidth(m_compactMode ? 220 : 320);
+    statusPanel->setMinimumWidth(m_compactMode ? 330 : 380);
     statusPanel->setStyleSheet(
         QStringLiteral("QFrame{background:%1; border:1px solid %2; border-radius:8px;}").arg(kPanelColor).arg(kLineColor));
     QVBoxLayout *statusLayout = new QVBoxLayout(statusPanel);
-    statusLayout->setContentsMargins(m_compactMode ? 10 : 16, m_compactMode ? 8 : 14,
-                                     m_compactMode ? 10 : 16, m_compactMode ? 8 : 14);
-    statusLayout->setSpacing(m_compactMode ? 6 : 10);
+    statusLayout->setContentsMargins(m_compactMode ? 8 : 14, m_compactMode ? 6 : 12,
+                                     m_compactMode ? 8 : 14, m_compactMode ? 6 : 12);
+    statusLayout->setSpacing(m_compactMode ? 5 : 9);
 
     m_visionStatusLabel = new QLabel(QStringLiteral("视觉状态：等待识别"));
     m_visionStatusLabel->setWordWrap(true);
@@ -518,13 +519,13 @@ QWidget *MainWindow::createCameraPage()
         QStringLiteral("QLabel{background:white; border:2px solid %1; border-radius:8px; "
                        "padding:%2px; font-size:%3px; font-weight:900; color:%1;}")
             .arg(kWarningColor)
-            .arg(m_compactMode ? 8 : 12)
-            .arg(m_compactMode ? 17 : 24));
+            .arg(m_compactMode ? 6 : 12)
+            .arg(m_compactMode ? 15 : 24));
     statusLayout->addWidget(m_visionStatusLabel);
 
     m_visionModeLabel = new QLabel(QStringLiteral("模式：--"));
     m_visionBackendLabel = new QLabel(QStringLiteral("后端：--"));
-    m_visionPpeLabel = new QLabel(QStringLiteral("人员：--\n安全帽：--  口罩：--  反光背心：--"));
+    m_visionPpeLabel = new QLabel(QStringLiteral("人员：--\n安全帽：--  口罩：--\n反光背心：--"));
     m_visionSummaryLabel = new QLabel(QStringLiteral("结论：等待视觉模块启动"));
     QList<QLabel *> labels = {m_visionModeLabel, m_visionBackendLabel, m_visionPpeLabel, m_visionSummaryLabel};
     for (QLabel *label : labels) {
@@ -533,20 +534,20 @@ QWidget *MainWindow::createCameraPage()
             QStringLiteral("QLabel{background:white; border:1px solid %1; border-radius:8px; "
                            "padding:%2px; font-size:%3px; color:%4;}")
                 .arg(kLineColor)
-                .arg(m_compactMode ? 7 : 10)
-                .arg(m_compactMode ? 13 : 18)
+                .arg(m_compactMode ? 5 : 10)
+                .arg(m_compactMode ? 12 : 18)
                 .arg(kTextColor));
         statusLayout->addWidget(label);
     }
 
     m_visionCaptureButton = new QPushButton(QStringLiteral("拍照检测"));
-    m_visionCaptureButton->setMinimumHeight(m_compactMode ? 34 : 42);
+    m_visionCaptureButton->setMinimumHeight(m_compactMode ? 30 : 42);
     m_visionCaptureButton->setStyleSheet(
         QStringLiteral("QPushButton{background:%1; color:white; border:1px solid %1; "
                        "border-radius:6px; padding:5px 12px; font-size:%2px; font-weight:900;}"
                        "QPushButton:pressed{background:#185d66;}")
             .arg(kAccentColor)
-            .arg(m_compactMode ? 14 : 18));
+            .arg(m_compactMode ? 13 : 18));
     connect(m_visionCaptureButton, &QPushButton::clicked, this, &MainWindow::requestVisionCapture);
     statusLayout->addWidget(m_visionCaptureButton);
 
@@ -556,13 +557,13 @@ QWidget *MainWindow::createCameraPage()
     m_visionOffButton = new QPushButton(QStringLiteral("关闭"));
     QList<QPushButton *> modeButtons = {m_visionCloudButton, m_visionLocalButton, m_visionOffButton};
     for (QPushButton *button : modeButtons) {
-        button->setMinimumHeight(m_compactMode ? 32 : 40);
+        button->setMinimumHeight(m_compactMode ? 28 : 40);
         button->setStyleSheet(
             QStringLiteral("QPushButton{background:#ffffff; color:%1; border:1px solid %2; "
                            "border-radius:6px; padding:4px 10px; font-size:%3px; font-weight:800;}")
                 .arg(kAccentColor)
                 .arg(kLineColor)
-                .arg(m_compactMode ? 13 : 17));
+                .arg(m_compactMode ? 12 : 17));
         buttons->addWidget(button);
     }
     connect(m_visionCloudButton, &QPushButton::clicked, this, &MainWindow::setVisionModeCloud);
@@ -571,8 +572,8 @@ QWidget *MainWindow::createCameraPage()
     statusLayout->addLayout(buttons);
     statusLayout->addStretch();
 
-    layout->addWidget(imagePanel, 3);
-    layout->addWidget(statusPanel, 2);
+    layout->addWidget(imagePanel, 2);
+    layout->addWidget(statusPanel, 3);
     return page;
 }
 
@@ -888,7 +889,7 @@ void MainWindow::onStatusChanged(const SystemStatus &s)
     }
     if (m_visionPpeLabel) {
         m_visionPpeLabel->setText(
-            QStringLiteral("人员：%1\n安全帽：%2  口罩：%3  反光背心：%4\n缺失：%5")
+            QStringLiteral("人员：%1\n安全帽：%2  口罩：%3\n反光背心：%4\n缺失：%5")
                 .arg(s.visionPersonDetected ? QStringLiteral("检测到") : QStringLiteral("未检测到"))
                 .arg(optionalStateText(s.visionHelmetState))
                 .arg(optionalStateText(s.visionMaskState))

@@ -79,6 +79,25 @@ python3 app_2k1000la/vision_service.py --follow-cloud-mode --loop
 - 需要克隆并编译 `loongson-safety-vision`，保证目录中存在 `safety_check.py`、`yolo_detect`、`best320_opt.param`、`best320_opt.bin`。
 - 云端和本地不要同时跑；服务每一轮只执行当前模式，`off` 会释放摄像头句柄。
 
+本仓库已通过 submodule 引入 `AArcueid/loongson-safety-vision`：
+
+```bash
+git submodule update --init --recursive loongson-safety-vision
+```
+
+2K1000LA 上如果已有 `/home/xylt/visual_inspection` 的 NCNN 运行库，可直接编译：
+
+```bash
+cd ~/xylt/loongson-safety-vision
+g++ -O2 -std=c++14 src/yolo_detect.cpp \
+  -I/home/xylt/visual_inspection/depends \
+  -L/home/xylt/visual_inspection/formal \
+  -Wl,-rpath,/home/xylt/visual_inspection/formal \
+  -lncnn -lpthread -ldl \
+  -o yolo_detect
+chmod +x yolo_detect
+```
+
 摄像头与视觉识别模块目录。
 
 当前仅保留工程框架：

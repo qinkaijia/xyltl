@@ -657,7 +657,13 @@ def normalize_local_yolo_result(
         else:
             missing.append(text)
     missing = list(dict.fromkeys(missing))
-    ppe_status = "pass" if result.get("status") == "pass" else "fail" if person else "unknown"
+    raw_status = str(result.get("status") or "").lower()
+    if raw_status == "pass":
+        ppe_status = "pass"
+    elif raw_status == "fail" or missing:
+        ppe_status = "fail"
+    else:
+        ppe_status = "unknown"
     return {
         "vision_status": {
             "device_id": "board_2k1000la",

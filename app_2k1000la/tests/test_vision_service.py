@@ -36,6 +36,23 @@ def test_normalize_local_yolo_result_maps_ppe_fields(tmp_path: Path):
     assert status["missing_ppe"] == ["口罩"]
 
 
+def test_normalize_local_yolo_result_keeps_fail_without_person(tmp_path: Path):
+    image_path = tmp_path / "latest.jpg"
+    result = {
+        "status": "fail",
+        "missing": ["安全帽", "口罩"],
+        "summary": "不合格：缺安全帽、口罩",
+        "detections": [],
+    }
+
+    state = normalize_local_yolo_result(result, image_path, time.time())
+    status = state["vision_status"]
+
+    assert status["person_detected"] is False
+    assert status["ppe_status"] == "fail"
+    assert status["missing_ppe"] == ["安全帽", "口罩"]
+
+
 def test_read_mode_file_uses_valid_mode_only(tmp_path: Path):
     mode_file = tmp_path / "mode_request.json"
     mode_file.write_text('{"mode":"off"}', encoding="utf-8")
