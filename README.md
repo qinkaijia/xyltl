@@ -81,21 +81,19 @@ ss -ltnp | grep :1883
 在 301：
 
 ```bash
-cd /home/root
-./main
+/root/xylt_301_main_nopaho
 ```
 
 后台运行时：
 
 ```bash
-cd /home/root
-nohup ./main > /home/root/xylt_301.log 2>&1 &
+nohup /root/xylt_301_main_nopaho > /tmp/xylt_301.log 2>&1 &
 ```
 
 确认只保留一个主程序：
 
 ```bash
-ps | awk '$4=="main" {print}'
+ps | grep '[x]ylt_301_main_nopaho'
 ```
 
 抓 MQTT 数据可在 2K1000LA 上运行：
@@ -139,7 +137,18 @@ tail -c 800 ~/xylt/runtime/latest_evaluate_response.json
 
 ### 4.5 启动 2K1000LA USB 摄像头视觉服务
 
-云端豆包视觉模式：
+云端豆包视觉模式默认每 5 分钟抓拍上传一次；语音助手问“穿戴是否规范/有无安全隐患”时，会写入 `runtime/vision/capture_request.json` 触发立即抓拍。图片和分析结果会保存到 `runtime/vision/latest.*`，同时归档到 SD 卡 `/media/xylt/0403-0201/xylt_vision_archive`，默认保留 7 天且总量不超过 1GB。
+
+SafeCloud 侧需要配置豆包视觉 Responses API，密钥只写入本地 `.env` 或运行环境，不提交到 Git：
+
+```bash
+export DOUBAO_VISION_API_KEY="你的火山方舟 API Key"
+export DOUBAO_VISION_API_URL="https://ark.cn-beijing.volces.com/api/v3/responses"
+export DOUBAO_VISION_MODEL="doubao-seed-2-0-lite-260428"
+export DOUBAO_VISION_API_TYPE=responses
+```
+
+板端启动：
 
 ```bash
 cd ~/xylt
@@ -148,8 +157,11 @@ env PYTHONUNBUFFERED=1 PYTHONPATH=. python3 app_2k1000la/vision_service.py \
   --camera-index 0 \
   --mode cloud \
   --output-dir runtime/vision \
+  --periodic-upload-seconds 300 \
+  --capture-request-file runtime/vision/capture_request.json \
+  --archive-dir /media/xylt/0403-0201/xylt_vision_archive \
   --loop \
-  --interval 5 \
+  --interval 1 \
   --include-debug
 ```
 
@@ -171,7 +183,7 @@ export LOONGSON_SAFETY_VISION_DIR=$HOME/loongson-safety-vision
 python3 app_2k1000la/vision_service.py --mode local --loop
 ```
 
-视觉服务会写出 `runtime/vision/latest.jpg`、`runtime/vision/vision_state.json` 和 `runtime/vision/mode_request.json`。
+视觉服务会写出 `runtime/vision/latest.jpg`、`runtime/vision/vision_state.json`、`runtime/vision/mode_request.json` 和按需触发入口 `runtime/vision/capture_request.json`。
 
 ### 5. 启动 Qt HMI
 
@@ -243,6 +255,21 @@ PYTHONPATH=. python3 voice_llm_demo/main.py \
   --max-reply-chars 120
 ```
 
+视觉联动问答测试。该路径会写入 `runtime/vision/capture_request.json`，等待 `vision_service.py` 抓拍、调用豆包视觉 Responses API，再结合 `runtime/latest_evaluate_response.json` 中的 301 温度、湿度、TVOC、eCO2、MQ-3、火焰和风险值合成回答：
+
+```bash
+cd ~/xylt
+PYTHONPATH=. python3 voice_llm_demo/main.py \
+  --manual-text 现在穿戴规范吗 \
+  --assistant-state-file runtime/voice_assistant_state.json \
+  --context-status-file runtime/latest_evaluate_response.json \
+  --real-llm \
+  --llm-provider doubao \
+  --tts-mode baidu
+```
+
+触发关键词包括：`穿戴规范`、`安全帽`、`口罩`、`反光背心`、`摄像头`、`现场画面`、`安全隐患`、`视觉巡检`。30 秒内重复问会复用最近视觉结果；说“重新拍”“再看一下”“拍一下”会强制重新抓拍。
+
 真实大模型需要在启动语音进程前配置对应环境变量，推荐写入不会提交到 Git 的 `voice_llm_demo/.env`。真实 LLM 模式下，密钥、网络或模型调用失败会在 Qt/终端显示明确错误，不会回退成本地占位回答：
 
 ```bash
@@ -312,13 +339,14 @@ Windows 停 SafeCloud：在运行窗口按 `Ctrl+C`。
 
 ```bash
 pkill -f 'app_2k1000la/cloud_client.py'
+pkill -f 'app_2k1000la/vision_service.py'
 pkill -x display_qt_app
 ```
 
 301 停主程序：
 
 ```bash
-for pid in $(ps | awk '$4=="main" {print $1}'); do kill "$pid"; done
+pkill -f '/root/xylt_301_main_nopaho'
 ```
 
 ## 顶层模块
@@ -374,6 +402,9 @@ for pid in $(ps | awk '$4=="main" {print $1}'); do kill "$pid"; done
 - Qt HMI 已通过 `--status-file runtime/latest_evaluate_response.json` 完成板端真实数据源烟测。
 - SafeCloud Web/命令 API 已能通过 MQTT 下发 `fan_control`、`buzzer_control`、`alarm_light` 到 301，并显示 ACK。
 - 语音 demo 已能将 `打开风扇`、`打开蜂鸣器`、`红灯闪烁` 走完整 LLM/SafetyGuard/MQTT 控制链路并收到 301 ACK。
+- SafeCloud 视觉接口已切换到火山方舟 Responses API，默认模型 `doubao-seed-2-0-lite-260428`。
+- 2K1000LA 视觉服务已支持 5 分钟周期抓拍、`runtime/vision/capture_request.json` 语音按需触发、SD 卡归档和 7 天/1GB 清理。
+- 语音助手已支持“穿戴规范/安全隐患/摄像头”等视觉问答，回答会同时引用 PPE 判断和 301 环境指标。
 
 下一步：
 

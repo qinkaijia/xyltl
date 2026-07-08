@@ -49,11 +49,14 @@
 - Windows SafeCloud：`http://192.168.43.5:8010`
 - SafeCloud UDP discovery：`8011`
 - 2K1000LA Mosquitto：`0.0.0.0:1883`
-- 301 主程序：`/home/root/main`
+- 301 主程序：`/root/xylt_301_main_nopaho`
 - 2K1000LA 真实响应输出样例：`runtime/latest_evaluate_response.json`
 - Qt HMI 文件数据源：`qt_hmi/build_qmake/display_qt_app --status-file runtime/latest_evaluate_response.json`
 - SafeCloud 控制入口：`POST /api/commands`，启用 MQTT 后直接下发到 301 并返回 ACK。
 - 语音真实控制入口：`voice_llm_demo/main.py --manual-text ... --mqtt-control --mqtt-host 127.0.0.1`
+- 视觉输出文件：`runtime/vision/latest.jpg`、`runtime/vision/vision_state.json`
+- 语音触发视觉入口：`runtime/vision/capture_request.json`
+- 视觉 SD 卡归档：`/media/xylt/0403-0201/xylt_vision_archive`
 
 2K1000LA 已安装：
 
@@ -132,15 +135,13 @@ env PYTHONUNBUFFERED=1 PYTHONPATH=. python3 app_2k1000la/cloud_client.py \
 ### 301 手动运行主程序
 
 ```bash
-cd /home/root
-./main
+/root/xylt_301_main_nopaho
 ```
 
 短时测试可用：
 
 ```bash
-cd /home/root
-timeout -s INT 12 ./main
+timeout -s INT 12 /root/xylt_301_main_nopaho
 ```
 
 ### 2K1000LA 抓 MQTT
@@ -222,20 +223,62 @@ PYTHONPATH=. python3 voice_llm_demo/main.py \
 红灯闪烁   -> ALARM_LIGHT    -> 301 ACK 成功
 ```
 
+### 2K1000LA 视觉服务与语音联动
+
+SafeCloud 侧使用火山方舟 Responses API：
+
+```text
+DOUBAO_VISION_API_URL=https://ark.cn-beijing.volces.com/api/v3/responses
+DOUBAO_VISION_MODEL=doubao-seed-2-0-lite-260428
+DOUBAO_VISION_API_TYPE=responses
+```
+
+板端视觉服务：
+
+```bash
+cd ~/xylt
+env PYTHONUNBUFFERED=1 PYTHONPATH=. python3 app_2k1000la/vision_service.py \
+  --base-url http://192.168.43.5:8010 \
+  --camera-index 0 \
+  --mode cloud \
+  --output-dir runtime/vision \
+  --periodic-upload-seconds 300 \
+  --capture-request-file runtime/vision/capture_request.json \
+  --archive-dir /media/xylt/0403-0201/xylt_vision_archive \
+  --loop \
+  --interval 1 \
+  --include-debug
+```
+
+语音触发抓拍问答：
+
+```bash
+cd ~/xylt
+PYTHONPATH=. python3 voice_llm_demo/main.py \
+  --manual-text 现在穿戴规范吗 \
+  --assistant-state-file runtime/voice_assistant_state.json \
+  --context-status-file runtime/latest_evaluate_response.json \
+  --real-llm \
+  --llm-provider doubao \
+  --tts-mode baidu
+```
+
+回答应同时包含 PPE 判断和 301 环境指标结论。30 秒内重复同类问题默认复用最近视觉结果；“重新拍/再看一下/拍一下”会强制抓拍。
+
 ## 已知问题
 
 1. **301 传感器提示**：运行时偶发 `SGP30 写入湿度补偿失败`、`ADC_CH0 timeout`、`I2C 写入 3 字节失败`，但主程序会继续上报 MQTT 数据。
 2. **旧轮询进程干扰**：首次稳定性测试发现板端残留 `gas_alarm.json` 轮询进程会覆盖输出文件；已停止旧用户服务并清理残留进程。
 3. **systemd 暂缓启用**：当前阶段手动联调更直观，正式开机自启动放到最后统一编排。
 4. **301 稳定性仍需复测**：首次脏环境测试期间 301 曾重启一次；清理旧进程后的 5 分钟测试未复现。
-5. **301 残留进程会干扰 ACK**：本轮 P3/P4 前发现 301 上残留多个 `main` 进程，需清理到只保留一个实例。BusyBox `ps` 下可用 `ps | awk '$4=="main" {print}'` 检查。
+5. **301 残留进程会干扰 ACK**：若 301 上残留多个 `xylt_301_main_nopaho` 进程，需清理到只保留一个实例。BusyBox `ps` 下可用 `ps | grep '[x]ylt_301_main_nopaho'` 检查。
 6. **中文命令通过 SSH here-doc 可能乱码**：远程自动测试语音时可用 Unicode 转义，实际终端交互或 ASR 返回正常 UTF-8 文本即可。
 
 ## 本轮稳定性结果
 
 测试时间：2026-07-07 约 19:00。
 
-- 301：`/home/root/main` 连续运行到 `timeout -s INT` 正常退出，累计报警次数为 0。
+- 301：`/root/xylt_301_main_nopaho` 连续运行到 `timeout -s INT` 正常退出，累计报警次数为 0。
 - 2K1000LA：`cloud_client.py --sensor-source 2k0301 --loop --interval 2` 自然结束。
 - SafeCloud：持续返回 `debug.client.ok=true`，最终 `base_url=http://192.168.43.5:8010`。
 - 结果数量：2K1000LA 日志中共出现 155 条 `evaluate_result`。
@@ -252,7 +295,7 @@ PYTHONPATH=. python3 voice_llm_demo/main.py \
 
 ### P1 做 5-10 分钟连续稳定性测试（已完成）
 
-- 301 持续运行 `/home/root/main`。
+- 301 持续运行 `/root/xylt_301_main_nopaho`。
 - 2K1000LA 使用 `cloud_client.py --sensor-source 2k0301 --loop`。
 - 已确认 MQTT、SafeCloud、输出 JSON 在本轮约 5 分钟测试中持续刷新。
 

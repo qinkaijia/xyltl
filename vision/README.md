@@ -22,10 +22,20 @@ python3 app_2k1000la/vision_service.py \
   --camera-index 0 \
   --mode cloud \
   --output-dir runtime/vision \
+  --periodic-upload-seconds 300 \
+  --capture-request-file runtime/vision/capture_request.json \
+  --archive-dir /media/xylt/0403-0201/xylt_vision_archive \
   --loop \
-  --interval 5 \
+  --interval 1 \
   --include-debug
 ```
+
+默认策略：
+
+- 周期抓拍：每 300 秒上传一次关键帧。
+- 语音触发：语音助手命中“穿戴规范/安全帽/口罩/安全隐患/视觉巡检”等关键词时写入 `runtime/vision/capture_request.json`，视觉服务立即抓拍上传。
+- 复用：30 秒内重复问同类问题时复用最近视觉结果；说“重新拍/再看一下/拍一下”会强制抓拍。
+- 归档：最新图像和分析结果写入 `runtime/vision/latest.*`，历史归档到 SD 卡 `/media/xylt/0403-0201/xylt_vision_archive`，默认保留 7 天且总量不超过 1GB。
 
 本地 YOLO 模式示例：
 
@@ -50,6 +60,7 @@ python3 app_2k1000la/vision_service.py --follow-cloud-mode --loop
 - `runtime/vision/latest.jpg`：最新关键帧，供 Qt HMI 展示。
 - `runtime/vision/vision_state.json`：最新视觉评估结果，供 Qt HMI 轮询。
 - `runtime/vision/mode_request.json`：Qt HMI 写入的模式切换请求。
+- `runtime/vision/capture_request.json`：语音助手写入的按需抓拍请求。
 
 本地 YOLO 依赖：
 

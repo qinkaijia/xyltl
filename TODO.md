@@ -27,7 +27,7 @@
 - SafeCloud Web 大屏已增加 `/api/evaluate` 安全评估面板，可选择模拟场景并查看模型明细。
 - SafeCloud Web Dashboard 已改为分页面控制台：监护总览、环境监测、AI 评估、告警控制。
 - 2K1000LA 已安装并启动 Mosquitto，作为 301 MQTT Broker。
-- 301 真实程序 `/home/root/main` 已成功连接 2K1000LA Broker 并发布传感器数据与心跳。
+- 301 真实程序 `/root/xylt_301_main_nopaho` 已成功连接 2K1000LA Broker 并发布传感器数据与心跳。
 - 2K1000LA 已通过 `--sensor-source 2k0301` 读取真实 301 MQTT 数据并调用电脑 SafeCloud `/api/evaluate`。
 - 2K1000LA 已成功向 301 下发 `fan_control` MQTT 命令，并收到 301 ACK。
 - 2K1000LA 默认 MQTT topic 已统一为真实 301 使用的 `device/board_2k0301/...`。
@@ -37,11 +37,14 @@
 - 语音 demo 已支持将 `打开风扇`、`打开蜂鸣器`、`红灯闪烁` 转换为真实 MQTT 控制命令，2K1000LA 板端联调收到 301 ACK。
 - Qt HMI 已通过 `--voice-file` 显示语音助手最近问题、模型回复、执行结果和助手状态。
 - 语音 demo 已增加普通问答的大模型接入入口，并对历史轮数、问题长度、上下文长度和回复长度做限制。
+- SafeCloud 视觉接口已切换到火山方舟 Responses API，默认模型 `doubao-seed-2-0-lite-260428`。
+- 2K1000LA 视觉服务已支持 5 分钟周期抓拍、`runtime/vision/capture_request.json` 语音按需触发、SD 卡归档和 7 天/1GB 清理。
+- 语音助手已支持穿戴规范、安全帽、口罩、摄像头、安全隐患等视觉问答，回答同时引用 PPE 判断和 301 环境指标。
 
 ## 当前联调任务
 
 1. 继续观察 301 偶发 SGP30/I2C/ADC 提示，区分传感器噪声和通信故障。
-2. 在板端配置真实 LLM API Key 环境变量，验证语音普通问答的真实大模型调用。
+2. 在板端配置真实 LLM API Key 和豆包视觉 Key 环境变量，验证语音普通问答与视觉抓拍问答。
 3. 做一次更长时间的赛前稳定性复测，重点记录 MQTT 重连、云端超时回退、301 重启恢复。
 4. 将 Qt HMI 的控制入口按需要接入 `modules/control` 同一套命令客户端。
 5. 最后阶段再做板端开机自启动编排。

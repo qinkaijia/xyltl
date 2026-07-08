@@ -13,6 +13,8 @@ class VisionEvaluateRequest(BaseModel):
     image_base64: str
     image_mime: str = Field(default="image/jpeg")
     mode: VisionMode = Field(default="cloud")
+    trigger: str = Field(default="manual")
+    request_id: str = Field(default="")
     sensor_snapshot: dict[str, Any] = Field(default_factory=dict)
     include_debug: bool = Field(default=False)
 

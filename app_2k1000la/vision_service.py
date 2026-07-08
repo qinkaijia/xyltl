@@ -5,6 +5,7 @@ import base64
 import importlib.util
 import json
 import os
+import shutil
 import sys
 import time
 import urllib.error
@@ -23,6 +24,12 @@ from app_2k1000la.cloud_client import DEFAULT_BASE_URL, default_cache_file, reso
 
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "runtime" / "vision"
 DEFAULT_MODE_FILE = DEFAULT_OUTPUT_DIR / "mode_request.json"
+DEFAULT_CAPTURE_REQUEST_FILE = DEFAULT_OUTPUT_DIR / "capture_request.json"
+DEFAULT_ARCHIVE_DIR = Path("/media/xylt/0403-0201/xylt_vision_archive")
+DEFAULT_PERIODIC_UPLOAD_SECONDS = 300.0
+DEFAULT_TRIGGER_MIN_INTERVAL_SECONDS = 30.0
+DEFAULT_ARCHIVE_MAX_AGE_DAYS = 7.0
+DEFAULT_ARCHIVE_MAX_BYTES = 1_073_741_824
 DEFAULT_LOCAL_VISION_DIRS = [
     REPO_ROOT / "loongson-safety-vision",
     REPO_ROOT / "vision" / "loongson-safety-vision",
@@ -74,12 +81,92 @@ def fetch_cloud_mode(base_url: str, timeout: float, fallback: str) -> str:
     return fallback
 
 
-def error_status(mode: str, backend: str, message: str, image_path: Path | None = None, elapsed_ms: int = 0) -> dict[str, Any]:
+def read_capture_request(path: Path) -> dict[str, Any] | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    request_id = str(data.get("request_id") or data.get("id") or "").strip()
+    if not request_id:
+        request_id = str(data.get("created_at") or path.stat().st_mtime_ns)
+    trigger = str(data.get("trigger") or "manual").strip() or "manual"
+    return {
+        "request_id": request_id,
+        "trigger": trigger,
+        "question": str(data.get("question") or ""),
+        "force": bool(data.get("force")),
+        "created_at": str(data.get("created_at") or ""),
+    }
+
+
+def sanitize_name_part(value: str, default: str = "capture") -> str:
+    text = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in str(value or ""))
+    text = text.strip("_")
+    return (text or default)[:48]
+
+
+def prune_archive(archive_dir: Path, max_age_days: float, max_bytes: int) -> dict[str, int]:
+    if not archive_dir.exists() or max_age_days <= 0 and max_bytes <= 0:
+        return {"archive_pruned_files": 0, "archive_pruned_bytes": 0}
+
+    now = time.time()
+    max_age_seconds = max_age_days * 86400.0
+    files: list[tuple[float, int, Path]] = []
+    pruned_files = 0
+    pruned_bytes = 0
+
+    for path in archive_dir.rglob("*"):
+        if not path.is_file():
+            continue
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        if max_age_days > 0 and now - stat.st_mtime > max_age_seconds:
+            try:
+                size = stat.st_size
+                path.unlink()
+                pruned_files += 1
+                pruned_bytes += size
+            except OSError:
+                pass
+            continue
+        files.append((stat.st_mtime, stat.st_size, path))
+
+    if max_bytes > 0:
+        total_bytes = sum(size for _, size, _ in files)
+        for _, size, path in sorted(files, key=lambda item: item[0]):
+            if total_bytes <= max_bytes:
+                break
+            try:
+                path.unlink()
+                total_bytes -= size
+                pruned_files += 1
+                pruned_bytes += size
+            except OSError:
+                pass
+
+    return {"archive_pruned_files": pruned_files, "archive_pruned_bytes": pruned_bytes}
+
+
+def error_status(
+    mode: str,
+    backend: str,
+    message: str,
+    image_path: Path | None = None,
+    elapsed_ms: int = 0,
+    trigger: str = "manual",
+    request_id: str = "",
+) -> dict[str, Any]:
     return {
         "vision_status": {
             "device_id": "board_2k1000la",
             "timestamp": now_text(),
             "mode": mode,
+            "trigger": trigger,
+            "request_id": request_id,
             "backend": backend,
             "camera_online": False,
             "person_detected": False,
@@ -161,15 +248,21 @@ class VisionLoop:
         self.image_path = self.output_dir / "latest.jpg"
         self.state_path = self.output_dir / "vision_state.json"
         self.mode_file = Path(args.mode_file)
+        self.capture_request_file = Path(args.capture_request_file)
+        self.archive_dir = Path(args.archive_dir)
         self.camera = CameraSource(args.camera_index, args.width, args.height, args.test_image)
         self.local_runner = LocalYoloRunner(args.local_vision_dir)
+        self.last_request_id = ""
+        self.last_capture_monotonic = 0.0
+        self.next_periodic_at = 0.0
+        self.last_state: dict[str, Any] | None = None
 
-    def run_once(self) -> dict[str, Any]:
+    def run_once(self, trigger: str = "manual", request_id: str = "", question: str = "") -> dict[str, Any]:
         started = time.time()
         mode = self.current_mode()
         if mode == "off":
             self.camera.release()
-            state = error_status("off", "off", "视觉模块已关闭。")
+            state = error_status("off", "off", "视觉模块已关闭。", trigger=trigger, request_id=request_id)
             state["vision_status"].update({"ppe_status": "unknown", "error": "", "camera_online": False})
             self.write_state(state)
             return state
@@ -181,17 +274,71 @@ class VisionLoop:
         except Exception as exc:  # noqa: BLE001 - resident process writes a state file instead of crashing.
             self.camera.release()
             state = error_status(mode, "camera", str(exc), elapsed_ms=int((time.time() - started) * 1000))
+            state["vision_status"].update({"trigger": trigger, "request_id": request_id})
             self.write_state(state)
             return state
 
         if mode == "local":
-            state = self.local_runner.evaluate(frame, self.image_path, started)
+            state = self.local_runner.evaluate(frame, self.image_path, started, trigger=trigger, request_id=request_id)
+            if question:
+                state.setdefault("vision_status", {})["capture_question"] = question
             self.write_state(state)
             return state
 
-        state = self.evaluate_cloud(image_bytes, started)
+        state = self.evaluate_cloud(image_bytes, started, trigger=trigger, request_id=request_id, question=question)
         self.write_state(state)
         return state
+
+    def run_forever(self) -> None:
+        print(
+            "vision_loop "
+            f"periodic_upload_seconds={self.args.periodic_upload_seconds} "
+            f"capture_request_file={self.capture_request_file} "
+            f"archive_dir={self.archive_dir if not self.args.no_archive else 'disabled'}"
+        )
+        while True:
+            state = self.maybe_run_due_capture()
+            if state is not None:
+                print_state(state)
+            time.sleep(max(0.2, self.args.interval))
+
+    def maybe_run_due_capture(self) -> dict[str, Any] | None:
+        now = time.monotonic()
+        request = read_capture_request(self.capture_request_file)
+        if request and request["request_id"] != self.last_request_id:
+            force = bool(request.get("force"))
+            can_capture = force or now - self.last_capture_monotonic >= self.args.trigger_min_interval_seconds
+            self.last_request_id = str(request["request_id"])
+            if can_capture:
+                state = self.run_once(
+                    trigger=str(request.get("trigger") or "manual"),
+                    request_id=str(request.get("request_id") or ""),
+                    question=str(request.get("question") or ""),
+                )
+                self._mark_capture_done(now)
+                return state
+            if self.last_state is not None:
+                status = self.last_state.setdefault("vision_status", {})
+                status["reused_from_request_id"] = status.get("request_id", "")
+                status["request_id"] = request["request_id"]
+                status["trigger"] = request.get("trigger") or status.get("trigger") or "manual"
+                if request.get("question"):
+                    status["capture_question"] = request["question"]
+                status["reused_reason"] = "30 秒内已有视觉结果，复用最近一次抓拍。"
+                self.write_state(self.last_state)
+                return self.last_state
+
+        if self.args.periodic_upload_seconds > 0 and now >= self.next_periodic_at:
+            request_id = f"periodic-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            state = self.run_once(trigger="periodic", request_id=request_id)
+            self._mark_capture_done(now)
+            return state
+        return None
+
+    def _mark_capture_done(self, now: float) -> None:
+        self.last_capture_monotonic = now
+        if self.args.periodic_upload_seconds > 0:
+            self.next_periodic_at = now + self.args.periodic_upload_seconds
 
     def current_mode(self) -> str:
         mode = self.args.mode
@@ -200,13 +347,15 @@ class VisionLoop:
             mode = fetch_cloud_mode(self.base_url, self.args.timeout, mode)
         return mode if mode in {"cloud", "local", "off"} else "cloud"
 
-    def evaluate_cloud(self, image_bytes: bytes, started: float) -> dict[str, Any]:
+    def evaluate_cloud(self, image_bytes: bytes, started: float, trigger: str, request_id: str, question: str = "") -> dict[str, Any]:
         payload = {
             "device_id": "board_2k1000la",
             "timestamp": now_text(),
             "image_base64": base64.b64encode(image_bytes).decode("ascii"),
             "image_mime": "image/jpeg",
             "mode": "cloud",
+            "trigger": trigger,
+            "request_id": request_id,
             "sensor_snapshot": load_sensor_snapshot(Path(self.args.sensor_snapshot_file)),
             "include_debug": self.args.include_debug,
         }
@@ -215,6 +364,10 @@ class VisionLoop:
             status = state.setdefault("vision_status", {})
             status.setdefault("image_path", str(self.image_path))
             status.setdefault("latency_ms", int((time.time() - started) * 1000))
+            status.setdefault("trigger", trigger)
+            status.setdefault("request_id", request_id)
+            if question:
+                status["capture_question"] = question
             status["image_available"] = True
             return state
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
@@ -224,12 +377,78 @@ class VisionLoop:
                 f"SafeCloud 视觉请求失败: {exc}",
                 image_path=self.image_path,
                 elapsed_ms=int((time.time() - started) * 1000),
+                trigger=trigger,
+                request_id=request_id,
             )
 
     def write_state(self, state: dict[str, Any]) -> None:
         status = state.setdefault("vision_status", {})
         status.setdefault("image_path", str(self.image_path if self.image_path.exists() else ""))
+        if not self.args.no_archive:
+            status.update(
+                archive_capture(
+                    state,
+                    self.image_path,
+                    self.archive_dir,
+                    self.args.archive_max_age_days,
+                    self.args.archive_max_bytes,
+                )
+            )
         write_json_atomic(self.state_path, state)
+        self.last_state = state
+
+
+def archive_capture(
+    state: dict[str, Any],
+    image_path: Path,
+    archive_dir: Path,
+    max_age_days: float,
+    max_bytes: int,
+) -> dict[str, Any]:
+    status = state.setdefault("vision_status", {})
+    result: dict[str, Any] = {
+        "archive_dir": str(archive_dir),
+        "archive_image_path": "",
+        "archive_state_path": "",
+        "archive_pruned_files": 0,
+        "archive_pruned_bytes": 0,
+    }
+    try:
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now()
+        day_dir = archive_dir / timestamp.strftime("%Y%m%d")
+        day_dir.mkdir(parents=True, exist_ok=True)
+        trigger = sanitize_name_part(str(status.get("trigger") or "capture"))
+        request_id = sanitize_name_part(str(status.get("request_id") or timestamp.strftime("%H%M%S")))
+        stem = f"{timestamp.strftime('%H%M%S')}_{trigger}_{request_id}"
+
+        if image_path.exists():
+            archived_image = day_dir / f"{stem}.jpg"
+            shutil.copy2(image_path, archived_image)
+            result["archive_image_path"] = str(archived_image)
+
+        archived_state = day_dir / f"{stem}.json"
+        write_json_atomic(archived_state, state)
+        result["archive_state_path"] = str(archived_state)
+        result.update(prune_archive(archive_dir, max_age_days, max_bytes))
+    except OSError as exc:
+        result["archive_error"] = str(exc)
+    return result
+
+
+def print_state(state: dict[str, Any]) -> None:
+    status = state.get("vision_status", {})
+    print(
+        "vision_result "
+        f"mode={status.get('mode')} "
+        f"trigger={status.get('trigger')} "
+        f"request_id={status.get('request_id')} "
+        f"backend={status.get('backend')} "
+        f"ppe={status.get('ppe_status')} "
+        f"camera={status.get('camera_online')} "
+        f"latency_ms={status.get('latency_ms')} "
+        f"error={status.get('error', '')}"
+    )
 
 
 class LocalYoloRunner:
@@ -237,11 +456,11 @@ class LocalYoloRunner:
         self.local_vision_dir = local_vision_dir
         self._module = None
 
-    def evaluate(self, frame: Any, image_path: Path, started: float) -> dict[str, Any]:
+    def evaluate(self, frame: Any, image_path: Path, started: float, trigger: str = "manual", request_id: str = "") -> dict[str, Any]:
         try:
             module = self._load_module()
             result = module.check_frame(frame)
-            return normalize_local_yolo_result(result, image_path, started)
+            return normalize_local_yolo_result(result, image_path, started, trigger=trigger, request_id=request_id)
         except Exception as exc:  # noqa: BLE001
             return error_status(
                 "local",
@@ -249,6 +468,8 @@ class LocalYoloRunner:
                 f"本地 YOLO 推理失败: {exc}",
                 image_path=image_path,
                 elapsed_ms=int((time.time() - started) * 1000),
+                trigger=trigger,
+                request_id=request_id,
             )
 
     def _load_module(self) -> Any:
@@ -312,7 +533,13 @@ def encode_jpeg(frame: Any, image_path: Path, quality: int) -> bytes:
     return image_bytes
 
 
-def normalize_local_yolo_result(result: dict[str, Any], image_path: Path, started: float) -> dict[str, Any]:
+def normalize_local_yolo_result(
+    result: dict[str, Any],
+    image_path: Path,
+    started: float,
+    trigger: str = "manual",
+    request_id: str = "",
+) -> dict[str, Any]:
     detections = result.get("detections") if isinstance(result.get("detections"), list) else []
     labels = {str(item.get("name") or item.get("label") or "").lower() for item in detections if isinstance(item, dict)}
     person = "person" in labels
@@ -338,6 +565,8 @@ def normalize_local_yolo_result(result: dict[str, Any], image_path: Path, starte
             "device_id": "board_2k1000la",
             "timestamp": now_text(),
             "mode": "local",
+            "trigger": trigger,
+            "request_id": request_id,
             "backend": "local_yolo_ncnn",
             "camera_online": True,
             "person_detected": person,
@@ -395,7 +624,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--local-vision-dir", default="")
     parser.add_argument("--sensor-snapshot-file", default=str(REPO_ROOT / "runtime" / "latest_evaluate_response.json"))
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
-    parser.add_argument("--interval", type=float, default=5.0)
+    parser.add_argument("--capture-request-file", default=str(DEFAULT_CAPTURE_REQUEST_FILE))
+    parser.add_argument("--archive-dir", default=str(DEFAULT_ARCHIVE_DIR))
+    parser.add_argument("--archive-max-age-days", type=float, default=DEFAULT_ARCHIVE_MAX_AGE_DAYS)
+    parser.add_argument("--archive-max-bytes", type=int, default=DEFAULT_ARCHIVE_MAX_BYTES)
+    parser.add_argument("--no-archive", action="store_true")
+    parser.add_argument("--periodic-upload-seconds", type=float, default=DEFAULT_PERIODIC_UPLOAD_SECONDS)
+    parser.add_argument("--trigger-min-interval-seconds", type=float, default=DEFAULT_TRIGGER_MIN_INTERVAL_SECONDS)
+    parser.add_argument("--interval", type=float, default=1.0, help="Loop polling interval in seconds.")
     parser.add_argument("--loop", action="store_true")
     parser.add_argument("--include-debug", action="store_true")
     return parser.parse_args()
@@ -412,18 +648,12 @@ def main() -> None:
     )
     print(f"vision_safecloud_base_url={base_url} source={source}")
     loop = VisionLoop(args, base_url)
+    if args.loop:
+        loop.run_forever()
+        return
     while True:
         state = loop.run_once()
-        status = state.get("vision_status", {})
-        print(
-            "vision_result "
-            f"mode={status.get('mode')} "
-            f"backend={status.get('backend')} "
-            f"ppe={status.get('ppe_status')} "
-            f"camera={status.get('camera_online')} "
-            f"latency_ms={status.get('latency_ms')} "
-            f"error={status.get('error', '')}"
-        )
+        print_state(state)
         if not args.loop:
             break
         time.sleep(max(1.0, args.interval))

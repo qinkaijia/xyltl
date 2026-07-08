@@ -15,7 +15,8 @@ from app.schemas.vision import VisionEvaluateRequest, VisionMode
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_VISION_MODEL = "doubao-seed-1-6-vision-250615"
+DEFAULT_VISION_API_URL = "https://ark.cn-beijing.volces.com/api/v3/responses"
+DEFAULT_VISION_MODEL = "doubao-seed-2-0-lite-260428"
 MAX_IMAGE_BYTES = 2_500_000
 
 _LATEST_EVALUATION: dict[str, Any] | None = None
@@ -113,9 +114,14 @@ def set_mode(mode: VisionMode) -> VisionMode:
 class DoubaoVisionClient:
     def __init__(self) -> None:
         _load_env_files()
-        self.api_key = os.environ.get("DOUBAO_API_KEY", "").strip()
-        self.api_url = os.environ.get("DOUBAO_API_URL", "https://ark.cn-beijing.volces.com/api/v3/chat/completions").strip()
+        self.api_key = (os.environ.get("DOUBAO_VISION_API_KEY") or os.environ.get("DOUBAO_API_KEY", "")).strip()
+        self.api_url = (
+            os.environ.get("DOUBAO_VISION_API_URL")
+            or os.environ.get("DOUBAO_API_URL")
+            or DEFAULT_VISION_API_URL
+        ).strip()
         self.model = os.environ.get("DOUBAO_VISION_MODEL", DEFAULT_VISION_MODEL).strip()
+        self.api_type = os.environ.get("DOUBAO_VISION_API_TYPE", "responses").strip().lower()
         self.timeout = float(os.environ.get("DOUBAO_VISION_TIMEOUT", "45"))
 
     @property
@@ -126,14 +132,68 @@ class DoubaoVisionClient:
     def missing_config_message(self) -> str:
         missing = []
         if not self.api_key:
-            missing.append("DOUBAO_API_KEY")
+            missing.append("DOUBAO_VISION_API_KEY/DOUBAO_API_KEY")
         if not self.api_url:
-            missing.append("DOUBAO_API_URL")
+            missing.append("DOUBAO_VISION_API_URL")
         if not self.model:
             missing.append("DOUBAO_VISION_MODEL")
         return "缺少豆包视觉配置: " + ", ".join(missing)
 
     def evaluate(self, image_base64: str, image_mime: str, sensor_snapshot: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        request_body = self._build_request_body(image_base64, image_mime, sensor_snapshot)
+        started = time.time()
+        response = requests.post(
+            self.api_url,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json=request_body,
+            timeout=self.timeout,
+        )
+        elapsed_ms = int((time.time() - started) * 1000)
+        if response.status_code >= 400:
+            raise RuntimeError(f"HTTP {response.status_code}: {response.text[:600]}")
+        payload = response.json()
+        content = _extract_content(payload)
+        return _parse_json_content(content), {
+            "model": self.model,
+            "api_url": self.api_url,
+            "api_type": self.api_type,
+            "elapsed_ms": elapsed_ms,
+            "raw_content": content,
+        }
+
+    def _build_request_body(self, image_base64: str, image_mime: str, sensor_snapshot: dict[str, Any]) -> dict[str, Any]:
+        if self.api_type in {"chat", "chat_completions", "chat-completions"}:
+            return self._build_chat_completions_body(image_base64, image_mime, sensor_snapshot)
+        return self._build_responses_body(image_base64, image_mime, sensor_snapshot)
+
+    def _build_responses_body(self, image_base64: str, image_mime: str, sensor_snapshot: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "input": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_image",
+                            "image_url": f"data:{image_mime};base64,{image_base64}",
+                        },
+                        {
+                            "type": "input_text",
+                            "text": (
+                                "你是工业密闭空间安全监护仪的视觉安全评估模块。"
+                                "请只输出 JSON，不要输出 Markdown。"
+                                + _vision_prompt(sensor_snapshot)
+                            ),
+                        },
+                    ],
+                }
+            ],
+        }
+
+    def _build_chat_completions_body(self, image_base64: str, image_mime: str, sensor_snapshot: dict[str, Any]) -> dict[str, Any]:
         messages = [
             {
                 "role": "system",
@@ -158,32 +218,11 @@ class DoubaoVisionClient:
                 ],
             },
         ]
-        request_body = {
+        return {
             "model": self.model,
             "messages": messages,
             "temperature": 0.1,
             "max_tokens": 700,
-        }
-        started = time.time()
-        response = requests.post(
-            self.api_url,
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            json=request_body,
-            timeout=self.timeout,
-        )
-        elapsed_ms = int((time.time() - started) * 1000)
-        if response.status_code >= 400:
-            raise RuntimeError(f"HTTP {response.status_code}: {response.text[:600]}")
-        payload = response.json()
-        content = _extract_content(payload)
-        return _parse_json_content(content), {
-            "model": self.model,
-            "api_url": self.api_url,
-            "elapsed_ms": elapsed_ms,
-            "raw_content": content,
         }
 
 
@@ -275,6 +314,8 @@ def _base_status(payload: VisionEvaluateRequest, mode: VisionMode, backend: str,
         "device_id": payload.device_id,
         "timestamp": payload.timestamp.isoformat(),
         "mode": mode,
+        "trigger": payload.trigger,
+        "request_id": payload.request_id,
         "backend": backend,
         "camera_online": False,
         "person_detected": False,
@@ -315,9 +356,36 @@ def _strip_data_url(value: str) -> str:
 
 
 def _extract_content(payload: dict[str, Any]) -> str:
+    output_text = payload.get("output_text")
+    if isinstance(output_text, str) and output_text.strip():
+        return output_text
+
+    output = payload.get("output")
+    if isinstance(output, list):
+        parts: list[str] = []
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            content = item.get("content")
+            if isinstance(content, str):
+                parts.append(content)
+                continue
+            if not isinstance(content, list):
+                continue
+            for part in content:
+                if isinstance(part, str):
+                    parts.append(part)
+                elif isinstance(part, dict):
+                    text = part.get("text") or part.get("output_text")
+                    if isinstance(text, str):
+                        parts.append(text)
+        content_text = "".join(parts).strip()
+        if content_text:
+            return content_text
+
     choices = payload.get("choices") or []
     if not choices:
-        raise RuntimeError("豆包视觉响应缺少 choices")
+        raise RuntimeError("豆包视觉响应缺少 output_text/output/choices")
     message = choices[0].get("message") or {}
     content = message.get("content")
     if isinstance(content, list):

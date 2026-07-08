@@ -76,6 +76,19 @@ VOICE_WAKE_WORDS = [
 VOICE_WAKE_WINDOW_SECONDS = _float_env("VOICE_WAKE_WINDOW_SECONDS", 10.0)
 VOICE_TTS_MODE = os.environ.get("VOICE_TTS_MODE", "none").lower()
 VOICE_TTS_MAX_CHARS = _int_env("VOICE_TTS_MAX_CHARS", 120)
+VOICE_VISION_ENABLED = os.environ.get("VOICE_VISION_ENABLED", "1").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+VOICE_VISION_CAPTURE_REQUEST_FILE = os.environ.get(
+    "VOICE_VISION_CAPTURE_REQUEST_FILE",
+    "runtime/vision/capture_request.json",
+)
+VOICE_VISION_STATE_FILE = os.environ.get("VOICE_VISION_STATE_FILE", "runtime/vision/vision_state.json")
+VOICE_VISION_TIMEOUT_SECONDS = _float_env("VOICE_VISION_TIMEOUT_SECONDS", 90.0)
+VOICE_VISION_RECENT_SECONDS = _float_env("VOICE_VISION_RECENT_SECONDS", 30.0)
 
 # ASR mode: manual / baidu / xfyun
 ASR_MODE = os.environ.get("ASR_MODE", "manual")

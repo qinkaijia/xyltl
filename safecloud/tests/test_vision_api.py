@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import vision_service
+from app.services.vision_service import DoubaoVisionClient, _extract_content, _parse_json_content
 
 
 client = TestClient(app)
@@ -72,3 +73,26 @@ def test_vision_mode_switch():
     assert response.json()["mode"] == "local"
 
     client.post("/api/vision/mode", json={"mode": "cloud"})
+
+
+def test_doubao_client_builds_responses_payload(monkeypatch):
+    monkeypatch.setenv("DOUBAO_VISION_API_KEY", "test-key")
+    monkeypatch.setenv("DOUBAO_VISION_API_URL", "https://example.test/responses")
+    monkeypatch.setenv("DOUBAO_VISION_MODEL", "doubao-seed-2-0-lite-260428")
+    monkeypatch.setenv("DOUBAO_VISION_API_TYPE", "responses")
+
+    doubao = DoubaoVisionClient()
+    body = doubao._build_request_body("abc123", "image/jpeg", {"temperature": 25})
+
+    assert body["model"] == "doubao-seed-2-0-lite-260428"
+    content = body["input"][0]["content"]
+    assert content[0]["type"] == "input_image"
+    assert content[0]["image_url"].startswith("data:image/jpeg;base64,abc123")
+    assert content[1]["type"] == "input_text"
+    assert "temperature" in content[1]["text"]
+
+
+def test_extract_content_supports_responses_shapes():
+    assert _extract_content({"output_text": '{"ppe_status":"pass"}'}) == '{"ppe_status":"pass"}'
+    assert _extract_content({"output": [{"content": [{"type": "output_text", "text": '{"ppe_status":"fail"}'}]}]}) == '{"ppe_status":"fail"}'
+    assert _parse_json_content("```json\n{\"ppe_status\":\"pass\"}\n```")["ppe_status"] == "pass"

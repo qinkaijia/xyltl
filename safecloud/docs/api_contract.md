@@ -159,6 +159,8 @@
   "image_base64": "...",
   "image_mime": "image/jpeg",
   "mode": "cloud",
+  "trigger": "voice",
+  "request_id": "voice-1720420800000",
   "sensor_snapshot": {
     "temperature": 25.0,
     "humidity": 55.0,
@@ -179,6 +181,8 @@
   "vision_status": {
     "device_id": "board_2k1000la",
     "mode": "cloud",
+    "trigger": "voice",
+    "request_id": "voice-1720420800000",
     "backend": "doubao_vision",
     "camera_online": true,
     "person_detected": true,
@@ -202,6 +206,16 @@
 - `GET /api/vision/latest-image`
 - `GET /api/vision/mode`
 - `POST /api/vision/mode`，请求体：`{"mode":"cloud"}`，可选值为 `cloud/local/off`。
+
+云端视觉默认使用火山方舟 Responses API：
+
+```text
+DOUBAO_VISION_API_URL=https://ark.cn-beijing.volces.com/api/v3/responses
+DOUBAO_VISION_MODEL=doubao-seed-2-0-lite-260428
+DOUBAO_VISION_API_TYPE=responses
+```
+
+请求内容为 `input_image` + `input_text`，SafeCloud 会把 `output_text` 或 `output[].content[].text` 归一化为上面的 `vision_status`。密钥必须通过本地环境变量提供。
 
 约束：`local` YOLO 推理在 2K1000LA 板端运行，SafeCloud 只负责保存模式请求和云端视觉评估；云端和本地视觉推理不应同时运行。
 

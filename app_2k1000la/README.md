@@ -64,6 +64,7 @@ python3 app_2k1000la/cloud_client.py \
 - Broker：运行在 2K1000LA，301 连接 `192.168.43.36:1883`，2K1000LA 本地客户端默认连接 `127.0.0.1:1883`。
 - 认证：无。
 - Topic：`device/board_2k0301/sensor`、`device/board_2k0301/heartbeat`、`device/board_2k0301/ack`、`device/board_2k0301/error`、`device/board_2k0301/command`，QoS 1。
+- 当前 301 主程序路径：`/root/xylt_301_main_nopaho`。
 
 2K1000LA 会把 301 上报的 `temperature/humidity/tvoc/eco2/mq3_value/risk_score/flame_detected` 转换为云端 `metrics`。其中 `gas` 取 TVOC、eCO2、MQ-3、`risk_score` 的归一化最大值；`flame_detected=true` 时强制 `gas=1.0`，触发本地/云端高风险判断。
 
@@ -225,10 +226,20 @@ python3 app_2k1000la/vision_service.py \
   --camera-index 0 \
   --mode cloud \
   --output-dir runtime/vision \
+  --periodic-upload-seconds 300 \
+  --capture-request-file runtime/vision/capture_request.json \
+  --archive-dir /media/xylt/0403-0201/xylt_vision_archive \
   --loop \
-  --interval 5 \
+  --interval 1 \
   --include-debug
 ```
+
+说明：
+
+- `--periodic-upload-seconds 300`：默认每 5 分钟抓拍上传一次，避免持续消耗 token。
+- `runtime/vision/capture_request.json`：语音助手按需抓拍入口，写入后服务会立即拍照分析。
+- 30 秒内重复视觉问题默认复用最近结果；请求中 `force=true` 可强制重拍。
+- `--archive-dir`：将 JPEG 和对应 `vision_state` 归档到 SD 卡，默认清理策略为 7 天且总量不超过 1GB。
 
 联动网页模式切换：
 

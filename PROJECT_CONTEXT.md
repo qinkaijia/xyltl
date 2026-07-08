@@ -62,13 +62,16 @@
 - Qt HMI 已增加语音助手显示区，可通过 `--voice-file runtime/voice_assistant_state.json` 显示最近问题、模型回复、执行结果和助手状态。
 - 语音 demo 已增加普通问答的大模型接入入口，支持 `qwen/doubao/deepseek/kimi/zhipu`，并限制历史轮数、问题长度、上下文长度和回复长度。
 - SafeCloud Web 和 Qt HMI 已按 301 真实 payload 显示 `temperature/humidity/tvoc/eco2/mq3_value/flame_detected/risk_score`，界面层统一使用中文标签和值。
+- SafeCloud 视觉接口已切换到火山方舟 Responses API，默认 `DOUBAO_VISION_MODEL=doubao-seed-2-0-lite-260428`，输出统一归一化为 `vision_status`。
+- 2K1000LA `vision_service.py` 已支持 5 分钟周期抓拍、`runtime/vision/capture_request.json` 语音按需触发、SD 卡归档和 7 天/1GB 清理。
+- 语音助手已接入视觉联动：命中“穿戴规范/安全帽/口罩/摄像头/安全隐患/视觉巡检”等问题时触发抓拍，回答同时包含 PPE 判断和 301 温度、湿度、TVOC、eCO2、MQ-3、火焰、风险值。
 - 2026-07-08 复测时，301 原 C++ 程序未在板上运行；已在 301 上用 `/root/xylt_mqtt_tools/xylt_301_mqtt_mock.sh` 建立 `device/board_2k0301/...` MQTT mock 桥接，2K1000LA 已收到 sensor/heartbeat，并验证 `fan_control` ACK。301 C++ 工程已复制到 Linux VM `~/xylt_301/Loongson_2K300_301_LIB`，原厂 `build.sh` 卡在缺少目标架构 Paho MQTT C `MQTTClient.h/libpaho-mqtt3c`。详见 `docs/integration/2k0301_current_runtime_notes.md`。
 
 ## 下一步重点
 
 1. 赛前做更长时间稳定性复测，重点看 MQTT 重连、云端超时回退和 301 重启恢复。
-2. 在板端配置真实大模型 API Key 环境变量，做语音问答的真实云端调用复测。
-3. 在 2K1000LA 上接入真实 USB 摄像头做云端豆包视觉实测；本地 YOLO/NCNN 只在需要断网兜底时启用，避免和云端模式同时占用内存。
+2. 在板端配置真实大模型 API Key 和豆包视觉 Key 环境变量，做语音问答 + 视觉抓拍的真实云端调用复测。
+3. 在 2K1000LA 上做 USB 摄像头云端豆包视觉长时间复测；本地 YOLO/NCNN 只在需要断网兜底时启用，避免和云端模式同时占用内存。
 4. 根据现场交互需求，把 Qt HMI 控制按钮接入已验证的 `modules/control` 命令客户端。
 5. 最后阶段再配置板端开机自启动。
 6. 将关键报警动作继续保持在本地规则链路中，不依赖云端单点决策。

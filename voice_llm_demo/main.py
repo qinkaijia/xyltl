@@ -18,6 +18,7 @@ from llm import LLMClient
 from recorder import RecorderError, VADRecorder
 from safety import SafetyGuard
 from tts import VoiceSpeaker
+from vision_bridge import VisionAssistantBridge
 
 
 def setup_logging() -> None:
@@ -130,6 +131,7 @@ def run_once(
     wake_session_active: bool = False,
     skip_on_record_error: bool = False,
     listen_only: bool = False,
+    vision_bridge: VisionAssistantBridge | None = None,
 ) -> str:
     audio_path = ""
     asr_text = ""
@@ -196,6 +198,35 @@ def run_once(
                 return "armed"
             if woke:
                 asr_text = cleaned_text
+
+        if vision_bridge and vision_bridge.is_vision_query(asr_text):
+            if assistant_state:
+                assistant_state.update("thinking", state_text="视觉巡检中", last_user_text=asr_text, llm_provider="vision+doubao")
+            reply = vision_bridge.answer(asr_text)
+            print(f"\n系统回复：{reply}")
+            if speaker:
+                speaker.speak(reply)
+            if assistant_state:
+                assistant_state.update(
+                    "speaking",
+                    state_text="视觉巡检结果",
+                    last_user_text=asr_text,
+                    last_reply=reply,
+                    last_intent="vision_inspection",
+                    safety_message="视觉与 301 环境数据联合判断",
+                    llm_provider="vision+doubao",
+                    commit_history=True,
+                )
+            llm_result = {
+                "intent": "vision_inspection",
+                "need_execute": False,
+                "reply": reply,
+                "provider": "vision+doubao",
+            }
+            safety_ok = True
+            execute_ok = True
+            execute_message = "视觉巡检问答完成。"
+            return "handled"
 
         if assistant_state:
             assistant_state.update("thinking", state_text="大模型思考中", last_user_text=asr_text, llm_provider=llm_provider)
@@ -307,6 +338,7 @@ def run_text_once(
     assistant_state: AssistantStateWriter | None = None,
     llm_provider: str = "",
     speaker: VoiceSpeaker | None = None,
+    vision_bridge: VisionAssistantBridge | None = None,
 ) -> None:
     llm_result: dict = {}
     safety_ok = False
@@ -319,6 +351,35 @@ def run_text_once(
             print("ASR 文本为空，本轮结束。")
             if assistant_state:
                 assistant_state.update("error", state_text="文本为空", last_reply="没有收到有效文本。")
+            return
+
+        if vision_bridge and vision_bridge.is_vision_query(asr_text):
+            if assistant_state:
+                assistant_state.update("thinking", state_text="视觉巡检中", last_user_text=asr_text, llm_provider="vision+doubao")
+            reply = vision_bridge.answer(asr_text)
+            llm_result = {
+                "intent": "vision_inspection",
+                "need_execute": False,
+                "reply": reply,
+                "provider": "vision+doubao",
+            }
+            safety_ok = True
+            execute_ok = True
+            execute_message = "视觉巡检问答完成。"
+            print(f"\n系统回复：{reply}")
+            if speaker:
+                speaker.speak(reply)
+            if assistant_state:
+                assistant_state.update(
+                    "speaking",
+                    state_text="视觉巡检结果",
+                    last_user_text=asr_text,
+                    last_reply=reply,
+                    last_intent="vision_inspection",
+                    safety_message="视觉与 301 环境数据联合判断",
+                    llm_provider="vision+doubao",
+                    commit_history=True,
+                )
             return
 
         if assistant_state:
@@ -441,6 +502,10 @@ def main() -> None:
     state_file = args.assistant_state_file or config.VOICE_ASSISTANT_STATE_FILE
     assistant_state = AssistantStateWriter(state_file, max_history=args.max_history_turns or config.VOICE_MAX_HISTORY_TURNS)
     speaker = VoiceSpeaker(args.tts_mode or config.VOICE_TTS_MODE)
+    vision_bridge = VisionAssistantBridge(
+        context_status_file=args.context_status_file or config.VOICE_CONTEXT_STATUS_FILE,
+        enabled=config.VOICE_VISION_ENABLED,
+    )
     wake_words = parse_words(args.wake_words) or list(config.VOICE_WAKE_WORDS)
     wake_required = args.wake_required or config.VOICE_WAKE_REQUIRED
     wake_window_seconds = args.wake_window_seconds if args.wake_window_seconds > 0 else config.VOICE_WAKE_WINDOW_SECONDS
@@ -456,9 +521,20 @@ def main() -> None:
     if wake_required:
         print(f"唤醒窗口：{wake_window_seconds:.1f} 秒")
     print(f"播报模式：{speaker.mode}")
+    print(f"视觉语音联动：{'开启' if vision_bridge.enabled else '关闭'}")
 
     if args.manual_text:
-        run_text_once(args.manual_text, device_state, llm_client, safety_guard, dispatcher, assistant_state, llm_provider, speaker)
+        run_text_once(
+            args.manual_text,
+            device_state,
+            llm_client,
+            safety_guard,
+            dispatcher,
+            assistant_state,
+            llm_provider,
+            speaker,
+            vision_bridge,
+        )
         return
 
     if args.continuous:
@@ -484,6 +560,7 @@ def main() -> None:
                 wake_session_active=wake_session_active,
                 skip_on_record_error=True,
                 listen_only=args.listen_only,
+                vision_bridge=vision_bridge,
             )
             now = time.monotonic()
             wake_armed_until = next_wake_armed_until(
@@ -510,7 +587,18 @@ def main() -> None:
             if command == "q":
                 print("已退出。")
                 break
-            run_once(recorder, asr_client, device_state, llm_client, safety_guard, dispatcher, assistant_state, llm_provider, speaker)
+            run_once(
+                recorder,
+                asr_client,
+                device_state,
+                llm_client,
+                safety_guard,
+                dispatcher,
+                assistant_state,
+                llm_provider,
+                speaker,
+                vision_bridge=vision_bridge,
+            )
 
 
 if __name__ == "__main__":
