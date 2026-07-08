@@ -43,6 +43,7 @@ def evaluate(payload: EvaluateRequest) -> dict[str, Any]:
 
     debug = result.pop("_debug", None)
     result.update(_extract_2k0301_fields(payload))
+    _enforce_sensor_offline_status(result, payload)
     response: dict[str, Any] = {"final_status": result}
     if payload.include_debug:
         response["debug"] = debug
@@ -108,6 +109,38 @@ def _extract_2k0301_fields(payload: EvaluateRequest) -> dict[str, Any]:
             "risk_score": risk_score,
         },
     }
+
+
+def _enforce_sensor_offline_status(result: dict[str, Any], payload: EvaluateRequest) -> None:
+    metrics = payload.metrics
+    state = payload.system_state
+    temperature = _number(metrics.get("temperature"), 0.0)
+    humidity = _number(metrics.get("humidity"), 0.0)
+    sensor_online = bool(state.get("sensor_online", True))
+    has_invalid_sentinel = temperature <= -900.0 or humidity < 0.0
+    if sensor_online and not has_invalid_sentinel:
+        return
+
+    reason = "2K0301 传感器离线，温湿度或空气质量数据无效，无法确认现场环境。"
+    source_error = str(state.get("last_2k0301_error") or state.get("last_2k0301_reported_error") or "").strip()
+    if source_error:
+        reason = f"{reason}上报原因：{source_error}"
+    suggestion = "请检查 2K0301 传感器供电、I2C 接线和 SHT/SGP30 初始化状态；现场保持本地报警、排风和人工巡检。"
+    result["alarm_level"] = max(int(result.get("alarm_level") or 0), 2)
+    result["status_text"] = "报警"
+    result["reason"] = reason
+    result["suggestion"] = suggestion
+    result["voice_text"] = f"当前设备处于报警状态。{reason}。{suggestion}"
+    result["need_cloud_upload"] = True
+    result["need_voice_alert"] = True
+    result["sensor_online"] = False
+    result["offline_reason"] = source_error or "invalid_sensor_sentinel"
+    rule_hits = result.setdefault("rule_hits", [])
+    if isinstance(rule_hits, list) and "SENSOR_OFFLINE" not in rule_hits:
+        rule_hits.append("SENSOR_OFFLINE")
+    source = result.setdefault("source", {})
+    if isinstance(source, dict):
+        source["sensor_offline_guard"] = True
 
 
 def _normalize_2k0301_gas(metrics: dict[str, Any], state: dict[str, Any]) -> float:

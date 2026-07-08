@@ -41,12 +41,24 @@ MQTT Broker:       192.168.43.36:1883
 在 Windows PowerShell：
 
 ```powershell
-cd D:\xylt
+cd D:\xylt\safecloud
 $env:SAFECLOUD_MQTT_CONTROL_ENABLED="1"
 $env:SAFECLOUD_2K0301_MQTT_HOST="192.168.43.36"
 $env:SAFECLOUD_2K0301_MQTT_PORT="1883"
 $env:SAFECLOUD_2K0301_ACK_TIMEOUT="4"
-safecloud\.venv\Scripts\python.exe -m uvicorn safecloud.app.main:app --host 0.0.0.0 --port 8010
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8010
+```
+
+后台启动时，先在当前 PowerShell 设置环境变量，再直接 `Start-Process` Python，避免 MQTT 目标回退到 `127.0.0.1:1883`：
+
+```powershell
+cd D:\xylt\safecloud
+$env:SAFECLOUD_MQTT_CONTROL_ENABLED="1"
+$env:SAFECLOUD_2K0301_MQTT_HOST="192.168.43.36"
+$env:SAFECLOUD_2K0301_MQTT_PORT="1883"
+$env:SAFECLOUD_2K0301_ACK_TIMEOUT="4"
+Start-Process -FilePath ".\.venv\Scripts\python.exe" -WorkingDirectory "." -WindowStyle Hidden -ArgumentList @("-m","uvicorn","app.main:app","--host","0.0.0.0","--port","8010")
+Start-Process -FilePath ".\.venv\Scripts\python.exe" -WorkingDirectory "." -WindowStyle Hidden -ArgumentList @("discovery_responder.py","--bind-host","0.0.0.0","--discovery-port","8011","--service-port","8010")
 ```
 
 打开网页：

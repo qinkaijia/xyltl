@@ -308,6 +308,16 @@ def status_needs_voice_alert(status: Dict[str, Any]) -> bool:
 
 
 def alert_signature(status: Dict[str, Any]) -> str:
+    if status.get("sensor_online") is False or "SENSOR_OFFLINE" in (status.get("rule_hits") or []):
+        return json.dumps(
+            {
+                "device_id": status.get("device_id"),
+                "alarm_level": status.get("alarm_level"),
+                "category": "sensor_offline",
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
     sensor_metrics = status.get("sensor_metrics") if isinstance(status.get("sensor_metrics"), dict) else {}
     payload = {
         "alarm_level": status.get("alarm_level"),

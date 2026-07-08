@@ -27,6 +27,7 @@ def create_command(payload: CommandCreate, db: Session = Depends(get_db)):
         "delivery_elapsed_ms": delivery.get("elapsed_ms"),
         "ack": delivery.get("ack"),
         "transport_error": delivery.get("error"),
+        "transport_target": delivery.get("transport_target"),
     }
 
 

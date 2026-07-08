@@ -29,5 +29,6 @@ class CommandRead(BaseModel):
     delivery_elapsed_ms: int | None = None
     ack: dict[str, Any] | None = None
     transport_error: str | dict[str, Any] | None = None
+    transport_target: str | None = None
 
     model_config = {"from_attributes": True}

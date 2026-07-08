@@ -172,3 +172,39 @@ def test_voice_alert_manager_speaks_alerts_with_cooldown(monkeypatch):
         ("当前设备处于报警状态。检测到火焰。", "print"),
         ("当前设备处于报警状态。检测到火焰。", "print"),
     ]
+
+
+def test_voice_alert_manager_debounces_sensor_offline_reason_changes(monkeypatch):
+    spoken = []
+
+    def fake_speak(response, tts_mode=""):
+        spoken.append(response["final_status"]["voice_text"])
+        return True
+
+    monkeypatch.setattr(cloud_client_module, "speak_response", fake_speak)
+    manager = VoiceAlertManager(enabled=True, tts_mode="print", cooldown_seconds=30)
+    first = {
+        "final_status": {
+            "device_id": "board_2k0301",
+            "alarm_level": 2,
+            "need_voice_alert": True,
+            "sensor_online": False,
+            "reason": "2K0301 sensor_packet 超时",
+            "voice_text": "采集数据超时",
+        }
+    }
+    second = {
+        "final_status": {
+            "device_id": "board_2k0301",
+            "alarm_level": 2,
+            "need_voice_alert": True,
+            "sensor_online": False,
+            "reason": "2K0301 heartbeat reported sensor_online=false",
+            "voice_text": "心跳报告离线",
+        }
+    }
+
+    assert manager.maybe_speak(first, now=10) is True
+    assert manager.maybe_speak(second, now=12) is False
+    assert manager.maybe_speak(second, now=41) is True
+    assert spoken == ["采集数据超时", "心跳报告离线"]

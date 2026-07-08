@@ -83,3 +83,37 @@ def test_evaluate_preserves_2k0301_metrics_and_latest_result():
     latest = client.get("/api/evaluate/latest")
     assert latest.status_code == 200
     assert latest.json()["response"]["final_status"]["device_id"] == "board_2k0301"
+
+
+def test_evaluate_sensor_offline_guard_has_clear_reason():
+    response = client.post(
+        "/api/evaluate",
+        json={
+            "device_id": "board_2k0301",
+            "metrics": {
+                "temperature": -999.0,
+                "humidity": -1.0,
+                "tvoc": 0,
+                "eco2": 0,
+                "mq3_value": 0.002,
+                "flame_detected": False,
+                "risk_score": 0,
+            },
+            "system_state": {
+                "cloud_connected": True,
+                "sensor_online": False,
+                "actuator_online": True,
+                "source": "2k0301_mqtt",
+                "last_2k0301_error": "2K0301 sensor_packet contains invalid sentinel values",
+            },
+            "include_debug": True,
+        },
+    )
+
+    assert response.status_code == 200
+    final_status = response.json()["final_status"]
+    assert final_status["alarm_level"] == 2
+    assert final_status["sensor_online"] is False
+    assert "2K0301 传感器离线" in final_status["reason"]
+    assert "2K0301 传感器离线" in final_status["voice_text"]
+    assert final_status["need_voice_alert"] is True

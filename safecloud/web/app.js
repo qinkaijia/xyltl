@@ -326,6 +326,7 @@ function metricLabel(name) {
     mq3_value: "MQ-3 乙醇",
     flame_detected: "火焰检测",
     risk_score: "综合风险",
+    sensor_online: "采集板在线",
   };
   return labels[name] || name;
 }
@@ -401,15 +402,75 @@ function latestEvaluateMetrics() {
   }));
 }
 
+function latestEvaluateStatus() {
+  return state.latestEvaluation?.response?.final_status || null;
+}
+
+function liveDeviceSummary() {
+  const status = latestEvaluateStatus();
+  if (!status) return null;
+  const gatewayOnline = status.cloud_connected !== false;
+  const sensorOnline = status.sensor_online !== false;
+  return {
+    total: 2,
+    online: Number(gatewayOnline) + Number(sensorOnline),
+    counts: {
+      online: Number(gatewayOnline) + Number(sensorOnline),
+      offline: 2 - (Number(gatewayOnline) + Number(sensorOnline)),
+    },
+    devices: [
+      {
+        device_id: "board_2k1000la",
+        device_name: "龙芯 2K1000LA 主控",
+        device_type: "HMI / 语音 / 视觉 / 云端桥接",
+        status: gatewayOnline ? "online" : "offline",
+        location: "主控节点",
+        last_seen: status.timestamp,
+      },
+      {
+        device_id: status.device_id || "board_2k0301",
+        device_name: "龙芯 2K0301 采集与执行板",
+        device_type: "传感器采集 / 执行控制",
+        status: sensorOnline ? "online" : "offline",
+        location: status.sensor_source || "MQTT 板间通信",
+        last_seen: status.timestamp,
+      },
+    ],
+  };
+}
+
+function liveAlarmItems() {
+  const status = latestEvaluateStatus();
+  if (!status) return null;
+  const level = Number(status.alarm_level || 0);
+  if (level <= 0) return [];
+  return [
+    {
+      alarm_id: `eval-${status.timestamp || Date.now()}`,
+      device_id: status.device_id || "board_2k0301",
+      alarm_type: "safety_evaluate",
+      alarm_level: level,
+      alarm_message: status.reason || status.status_text || "当前存在风险报警",
+      metric_name: status.sensor_online === false ? "sensor_online" : "risk_score",
+      metric_value: status.sensor_online === false ? 0 : status.risk_score,
+      threshold_value: level,
+      status: "active",
+      created_at: status.timestamp,
+    },
+  ];
+}
+
 function renderKpis() {
   const summary = state.summary || {};
-  const total = summary.device_total || 0;
-  const online = summary.online_device_total || 0;
+  const liveDevices = liveDeviceSummary();
+  const liveAlarms = liveAlarmItems();
+  const total = liveDevices ? liveDevices.total : summary.device_total || 0;
+  const online = liveDevices ? liveDevices.online : summary.online_device_total || 0;
   const evaluateMetrics = latestEvaluateMetrics().map((metric) => metric.name);
   const metrics = evaluateMetrics.length ? evaluateMetrics : summary.metric_names || [];
   els.deviceTotal.textContent = total;
   els.onlineTotal.textContent = online;
-  els.activeAlarmTotal.textContent = summary.active_alarm_total || 0;
+  els.activeAlarmTotal.textContent = liveAlarms ? liveAlarms.length : summary.active_alarm_total || 0;
   els.metricTotal.textContent = metrics.length;
   els.onlineRatio.textContent = total ? `${Math.round((online / total) * 100)}% 在线率` : "0% 在线率";
   els.metricNames.textContent = metrics.length ? metrics.slice(0, 4).map(metricLabel).join(" / ") : "暂无指标";
@@ -441,7 +502,11 @@ function renderMetrics() {
   drawChart(metrics.slice(0, 10));
 }
 
-function renderAlarms(source = state.summary?.recent_alarms || []) {
+function renderAlarms(source = null) {
+  if (source === null) {
+    const liveAlarms = liveAlarmItems();
+    source = liveAlarms !== null ? liveAlarms : state.summary?.recent_alarms || [];
+  }
   if (!source.length) {
     els.alarmList.className = "list empty-state";
     els.alarmList.textContent = "暂无报警";
@@ -468,8 +533,9 @@ function renderAlarms(source = state.summary?.recent_alarms || []) {
 }
 
 function renderDevices() {
-  const devices = state.devices || [];
-  const counts = state.summary?.device_status || {};
+  const liveDevices = liveDeviceSummary();
+  const devices = liveDevices ? liveDevices.devices : state.devices || [];
+  const counts = liveDevices ? liveDevices.counts : state.summary?.device_status || {};
   els.deviceStatusText.textContent =
     Object.entries(counts)
       .map(([key, value]) => `${deviceStatusLabel(key)}: ${value}`)

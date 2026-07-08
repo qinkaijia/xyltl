@@ -9,6 +9,7 @@ from app.models.alarm import Alarm
 from app.models.device import Device
 from app.models.telemetry import TelemetryData
 from app.schemas.dashboard import DashboardSummary
+from app.services import analyzer_service
 from app.services.telemetry_service import latest_for_device
 
 
@@ -33,6 +34,44 @@ def dashboard_summary(db: Session = Depends(get_db)):
     recent_alarms = db.query(Alarm).order_by(Alarm.created_at.desc()).limit(10).all()
     device_status = Counter(device.status for device in devices)
 
+    extensions = {
+        "frontend_hint": "Ready for ECharts/Vue/React dashboards",
+        "latest_telemetry_count": len(latest_telemetry),
+    }
+    latest = analyzer_service.latest_evaluation()
+    final_status = ((latest or {}).get("response") or {}).get("final_status") if latest else None
+    if isinstance(final_status, dict):
+        gateway_online = final_status.get("cloud_connected") is not False
+        sensor_online = final_status.get("sensor_online") is not False
+        device_total = 2
+        online_device_total = int(gateway_online) + int(sensor_online)
+        active_alarm_total = 1 if int(final_status.get("alarm_level") or 0) > 0 else 0
+        device_status = {
+            "online": online_device_total,
+            "offline": device_total - online_device_total,
+        }
+        metric_names = [
+            "temperature",
+            "humidity",
+            "tvoc",
+            "eco2",
+            "mq3_value",
+            "flame_detected",
+            "risk_score",
+        ]
+        extensions["latest_evaluate_status"] = {
+            key: final_status.get(key)
+            for key in (
+                "device_id",
+                "timestamp",
+                "alarm_level",
+                "status_text",
+                "sensor_online",
+                "actuator_online",
+                "reason",
+            )
+        }
+
     return {
         "device_total": device_total,
         "online_device_total": online_device_total,
@@ -41,8 +80,5 @@ def dashboard_summary(db: Session = Depends(get_db)):
         "recent_alarms": recent_alarms,
         "device_status": dict(device_status),
         "metric_names": sorted(metric_names),
-        "extensions": {
-            "frontend_hint": "Ready for ECharts/Vue/React dashboards",
-            "latest_telemetry_count": len(latest_telemetry),
-        },
+        "extensions": extensions,
     }
