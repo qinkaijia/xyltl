@@ -340,8 +340,6 @@ class VoiceAlertManager:
         if not isinstance(status, dict):
             return False
         if not status_needs_voice_alert(status):
-            self.last_signature = ""
-            self.last_spoken_at = 0.0
             return False
 
         current_time = time.time() if now is None else now

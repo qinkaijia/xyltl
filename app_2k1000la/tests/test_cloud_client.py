@@ -164,6 +164,8 @@ def test_voice_alert_manager_speaks_alerts_with_cooldown(monkeypatch):
     assert manager.maybe_speak(first_alarm, now=101) is True
     assert manager.maybe_speak(first_alarm, now=110) is False
     assert manager.maybe_speak(changed_alarm, now=111) is True
+    assert manager.maybe_speak(normal, now=112) is False
+    assert manager.maybe_speak(changed_alarm, now=113) is False
     assert manager.maybe_speak(changed_alarm, now=142) is True
     assert spoken == [
         ("当前设备处于报警状态。温度过高。", "print"),
