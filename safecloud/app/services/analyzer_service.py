@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import importlib.util
 from pathlib import Path
 from typing import Any
 
@@ -14,10 +15,20 @@ ANALYZER_SRC = REPO_ROOT / "modules" / "analyzer" / "src"
 if str(ANALYZER_SRC) not in sys.path:
     sys.path.insert(0, str(ANALYZER_SRC))
 
-from main import run_demo  # noqa: E402
+_ANALYZER_MAIN_SPEC = importlib.util.spec_from_file_location("xylt_analyzer_main", ANALYZER_SRC / "main.py")
+if _ANALYZER_MAIN_SPEC is None or _ANALYZER_MAIN_SPEC.loader is None:
+    raise RuntimeError(f"无法加载 analyzer main.py: {ANALYZER_SRC / 'main.py'}")
+_ANALYZER_MAIN = importlib.util.module_from_spec(_ANALYZER_MAIN_SPEC)
+_ANALYZER_MAIN_SPEC.loader.exec_module(_ANALYZER_MAIN)
+run_demo = _ANALYZER_MAIN.run_demo
+
+
+_LATEST_EVALUATION: dict[str, Any] | None = None
 
 
 def evaluate(payload: EvaluateRequest) -> dict[str, Any]:
+    global _LATEST_EVALUATION
+
     previous_real_llm = os.environ.get("ANALYZER_USE_REAL_LLM")
     os.environ["ANALYZER_USE_REAL_LLM"] = "true" if payload.use_real_llm else "false"
 
@@ -31,23 +42,35 @@ def evaluate(payload: EvaluateRequest) -> dict[str, Any]:
             os.environ["ANALYZER_USE_REAL_LLM"] = previous_real_llm
 
     debug = result.pop("_debug", None)
+    result.update(_extract_2k0301_fields(payload))
     response: dict[str, Any] = {"final_status": result}
     if payload.include_debug:
         response["debug"] = debug
     else:
         response["debug"] = None
+    _LATEST_EVALUATION = {
+        "request": payload.model_dump(mode="json"),
+        "response": response,
+    }
     return response
+
+
+def latest_evaluation() -> dict[str, Any] | None:
+    return _LATEST_EVALUATION
 
 
 def _to_analyzer_input(payload: EvaluateRequest) -> dict[str, Any]:
     metrics = payload.metrics
     state = payload.system_state
+    gas_score = metrics.get("gas")
+    if gas_score is None:
+        gas_score = _normalize_2k0301_gas(metrics, state)
     return {
         "device_id": payload.device_id,
         "timestamp": payload.timestamp.isoformat(),
         "temperature": _number(metrics.get("temperature"), 0.0),
         "humidity": _number(metrics.get("humidity"), 0.0),
-        "gas": _number(metrics.get("gas"), 0.0),
+        "gas": _number(gas_score, 0.0),
         "vibration": _number(metrics.get("vibration"), 0.0),
         "current": _number(metrics.get("current"), 0.0),
         "cloud_connected": bool(state.get("cloud_connected", True)),
@@ -56,6 +79,56 @@ def _to_analyzer_input(payload: EvaluateRequest) -> dict[str, Any]:
         "user_question": state.get("user_question"),
         "request_report": bool(state.get("request_report", False)),
     }
+
+
+def _extract_2k0301_fields(payload: EvaluateRequest) -> dict[str, Any]:
+    metrics = payload.metrics
+    state = payload.system_state
+    tvoc = _number(metrics.get("tvoc", state.get("raw_tvoc")), 0.0)
+    eco2 = _number(metrics.get("eco2", state.get("raw_eco2")), 0.0)
+    mq3_value = _number(metrics.get("mq3_value", state.get("raw_mq3_value")), 0.0)
+    risk_score = _number(metrics.get("risk_score", state.get("raw_risk_score")), 0.0)
+    flame_detected = bool(metrics.get("flame_detected", state.get("flame_detected", False)))
+    return {
+        "tvoc": tvoc,
+        "eco2": eco2,
+        "mq3_value": mq3_value,
+        "flame_detected": flame_detected,
+        "risk_score": risk_score,
+        "sensor_online": bool(state.get("sensor_online", True)),
+        "actuator_online": bool(state.get("actuator_online", True)),
+        "sensor_source": state.get("source", ""),
+        "sensor_metrics": {
+            "temperature": _number(metrics.get("temperature"), 0.0),
+            "humidity": _number(metrics.get("humidity"), 0.0),
+            "tvoc": tvoc,
+            "eco2": eco2,
+            "mq3_value": mq3_value,
+            "flame_detected": flame_detected,
+            "risk_score": risk_score,
+        },
+    }
+
+
+def _normalize_2k0301_gas(metrics: dict[str, Any], state: dict[str, Any]) -> float:
+    flame_detected = bool(metrics.get("flame_detected", state.get("flame_detected", False)))
+    if flame_detected:
+        return 1.0
+    tvoc = _number(metrics.get("tvoc", state.get("raw_tvoc")), 0.0)
+    eco2 = _number(metrics.get("eco2", state.get("raw_eco2")), 400.0)
+    mq3_value = _number(metrics.get("mq3_value", state.get("raw_mq3_value")), 0.0)
+    risk_score = _number(metrics.get("risk_score", state.get("raw_risk_score")), 0.0)
+    scores = [
+        _clamp(tvoc / 60000.0),
+        _clamp((eco2 - 400.0) / (60000.0 - 400.0)),
+        _clamp(mq3_value / 999.0),
+        _clamp(risk_score / 100.0),
+    ]
+    return round(max(scores), 4)
+
+
+def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
+    return max(low, min(high, value))
 
 
 def _number(value: Any, default: float) -> float:

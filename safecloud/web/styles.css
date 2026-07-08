@@ -736,6 +736,32 @@ canvas {
   min-height: 92px;
 }
 
+.command-ack {
+  margin: 0;
+  min-height: 118px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--paper-soft);
+  color: var(--text);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.command-ack.is-ok {
+  border-color: rgba(31, 111, 88, 0.45);
+  background: var(--green-soft);
+}
+
+.command-ack.is-error {
+  border-color: rgba(183, 70, 63, 0.45);
+  background: var(--red-soft);
+}
+
 .evaluate-panel {
   grid-column: 1 / -1;
 }
@@ -802,6 +828,36 @@ canvas {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;
+}
+
+.sensor-result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(154px, 1fr));
+  gap: 10px;
+}
+
+.sensor-result-card {
+  min-height: 82px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, var(--teal-soft));
+}
+
+.sensor-result-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.sensor-result-card strong {
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .model-result-card {

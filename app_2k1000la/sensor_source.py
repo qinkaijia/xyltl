@@ -19,15 +19,15 @@ DEFAULT_MOCK_SCENARIOS = [
     "tests/scenarios/evaluate/normal.json",
     "tests/scenarios/evaluate/temperature_warning.json",
     "tests/scenarios/evaluate/gas_alarm.json",
-    "tests/scenarios/evaluate/vibration_alarm.json",
+    "tests/scenarios/evaluate/flame_alarm.json",
     "tests/scenarios/evaluate/sensor_offline.json",
 ]
 
-DEFAULT_2K0301_SENSOR_TOPIC = "device/2k0301/sensor"
-DEFAULT_2K0301_HEARTBEAT_TOPIC = "device/2k0301/heartbeat"
-DEFAULT_2K0301_ACK_TOPIC = "device/2k0301/ack"
-DEFAULT_2K0301_ERROR_TOPIC = "device/2k0301/error"
-DEFAULT_2K0301_COMMAND_TOPIC = "device/2k0301/command"
+DEFAULT_2K0301_SENSOR_TOPIC = "device/board_2k0301/sensor"
+DEFAULT_2K0301_HEARTBEAT_TOPIC = "device/board_2k0301/heartbeat"
+DEFAULT_2K0301_ACK_TOPIC = "device/board_2k0301/ack"
+DEFAULT_2K0301_ERROR_TOPIC = "device/board_2k0301/error"
+DEFAULT_2K0301_COMMAND_TOPIC = "device/board_2k0301/command"
 
 
 class SensorSourceError(RuntimeError):
@@ -263,6 +263,7 @@ def transform_2k0301_sensor_message(message: Dict[str, Any]) -> Dict[str, Any]:
     risk_score = number(payload.get("risk_score"), 0.0)
     flame_detected = bool(payload.get("flame_detected", False))
     gas = normalize_2k0301_gas(tvoc, eco2, mq3_value, risk_score, flame_detected)
+    sensor_online = not is_invalid_2k0301_sensor_value(temperature, humidity)
 
     return {
         "device_id": device_id,
@@ -270,14 +271,18 @@ def transform_2k0301_sensor_message(message: Dict[str, Any]) -> Dict[str, Any]:
         "metrics": {
             "temperature": temperature,
             "humidity": humidity,
+            "tvoc": tvoc,
+            "eco2": eco2,
+            "mq3_value": mq3_value,
+            "flame_detected": flame_detected,
+            "risk_score": risk_score,
+            # Keep a normalized gas score for the existing analyzer rule engine.
             "gas": gas,
-            "vibration": 0.0,
-            "current": 0.0,
         },
         "system_state": {
             "cloud_connected": True,
             "voice_state": "idle",
-            "sensor_online": True,
+            "sensor_online": sensor_online,
             "actuator_online": True,
             "flame_detected": flame_detected,
             "source": "2k0301_mqtt",
@@ -286,6 +291,7 @@ def transform_2k0301_sensor_message(message: Dict[str, Any]) -> Dict[str, Any]:
             "raw_eco2": eco2,
             "raw_mq3_value": mq3_value,
             "raw_risk_score": risk_score,
+            "last_2k0301_error": "" if sensor_online else "2K0301 sensor_packet contains invalid sentinel values",
         },
     }
 
@@ -306,6 +312,10 @@ def normalize_2k0301_gas(
     return round(max(tvoc_score, eco2_score, mq3_score, risk_score_value), 4)
 
 
+def is_invalid_2k0301_sensor_value(temperature: float, humidity: float) -> bool:
+    return temperature <= -900.0 or humidity < 0.0
+
+
 def build_2k0301_offline_payload(
     reason: str,
     latest_heartbeat: Optional[Dict[str, Any]] = None,
@@ -320,9 +330,12 @@ def build_2k0301_offline_payload(
         "metrics": {
             "temperature": 0.0,
             "humidity": 0.0,
+            "tvoc": 0.0,
+            "eco2": 0.0,
+            "mq3_value": 0.0,
+            "flame_detected": False,
+            "risk_score": 0.0,
             "gas": 0.0,
-            "vibration": 0.0,
-            "current": 0.0,
         },
         "system_state": {
             "cloud_connected": True,

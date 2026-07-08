@@ -12,7 +12,8 @@ def test_scenario_file_source_loads_request():
     payload = ScenarioFileSource("tests/scenarios/evaluate/normal.json").next_payload()
 
     assert payload["device_id"] == "scenario_normal"
-    assert payload["metrics"]["temperature"] == 30.0
+    assert payload["metrics"]["temperature"] == 25.0
+    assert payload["metrics"]["tvoc"] == 120
 
 
 def test_mock_source_cycles_scenarios():
@@ -55,8 +56,12 @@ def test_transform_2k0301_sensor_message():
     assert payload["device_id"] == "board_2k0301"
     assert payload["metrics"]["temperature"] == 28.0
     assert payload["metrics"]["humidity"] == 37.5
+    assert payload["metrics"]["tvoc"] == 5
+    assert payload["metrics"]["eco2"] == 400
+    assert payload["metrics"]["mq3_value"] == 0.004
+    assert payload["metrics"]["flame_detected"] is False
+    assert payload["metrics"]["risk_score"] == 5
     assert payload["metrics"]["gas"] == 0.05
-    assert payload["metrics"]["vibration"] == 0.0
     assert payload["system_state"]["source"] == "2k0301_mqtt"
     assert payload["system_state"]["source_seq"] == 0
     assert payload["system_state"]["raw_mq3_value"] == 0.004
@@ -64,6 +69,30 @@ def test_transform_2k0301_sensor_message():
 
 def test_transform_2k0301_flame_forces_high_gas_score():
     assert normalize_2k0301_gas(0, 400, 0, 0, flame_detected=True) == 1.0
+
+
+def test_transform_2k0301_invalid_sentinel_marks_sensor_offline():
+    payload = transform_2k0301_sensor_message(
+        {
+            "type": "sensor_packet",
+            "seq": 10,
+            "payload": {
+                "device_id": "board_2k0301",
+                "temperature": -999.0,
+                "humidity": -1.0,
+                "tvoc": 0,
+                "eco2": 0,
+                "mq3_value": 0.002,
+                "flame_detected": False,
+                "risk_score": 0,
+            },
+        }
+    )
+
+    assert payload["metrics"]["temperature"] == -999.0
+    assert payload["metrics"]["humidity"] == -1.0
+    assert payload["system_state"]["sensor_online"] is False
+    assert "invalid sentinel" in payload["system_state"]["last_2k0301_error"]
 
 
 def test_build_2k0301_offline_payload_uses_heartbeat_device_id():

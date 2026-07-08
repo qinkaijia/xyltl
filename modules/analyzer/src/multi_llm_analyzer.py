@@ -7,7 +7,7 @@ from models import LLMAnalysisResult, RuleResult, SensorData, SystemState
 
 
 class MultiLLMAnalyzer:
-    """Call routed LLM clients in order. Real clients fall back to mock."""
+    """Call routed LLM clients in order; real-mode failures stay explicit."""
 
     def __init__(self, llm_config: Dict) -> None:
         self.llm_config = llm_config

@@ -57,10 +57,11 @@ int main(int argc, char *argv[])
 
     const QStringList args = app.arguments();
     const QString statusFile = argumentValue(args, QStringLiteral("--status-file"));
+    const QString voiceFile = argumentValue(args, QStringLiteral("--voice-file"));
     const bool compactMode = args.contains(QStringLiteral("--compact"));
 
     MockDataProvider mockProvider;
-    FinalStatusDataProvider finalStatusProvider(statusFile);
+    FinalStatusDataProvider finalStatusProvider(statusFile, voiceFile);
     IDataProvider *provider = statusFile.isEmpty()
         ? static_cast<IDataProvider *>(&mockProvider)
         : static_cast<IDataProvider *>(&finalStatusProvider);

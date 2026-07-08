@@ -69,6 +69,26 @@ class BaseLLMClient:
         parsed = self._parse_json_content(content)
         return self._normalize_result(parsed, input_data, role)
 
+    def error_result(self, input_data: Dict, role: str, error: str) -> Dict:
+        rule_result = input_data.get("rule_result", {}) or {}
+        rule_level = self._safe_int(rule_result.get("alarm_level", 0), 0)
+        rule_hits = rule_result.get("rule_hits", [])
+        if isinstance(rule_hits, str):
+            rule_hits = [rule_hits]
+        if not isinstance(rule_hits, list):
+            rule_hits = []
+        suggestion = str(rule_result.get("suggestion") or "请检查大模型 API 配置与网络，关键动作按本地规则执行。")
+        return {
+            "model_name": self.model_name,
+            "role": role,
+            "alarm_level": rule_level,
+            "risk_summary": "真实大模型未完成有效评估，当前仅保留规则引擎兜底结果。",
+            "possible_causes": [str(item) for item in rule_hits if str(item).strip()] or ["真实大模型不可用"],
+            "suggestion": suggestion,
+            "confidence": 0.0,
+            "error": error,
+        }
+
     def is_available(self) -> bool:
         return (
             real_llm_enabled()

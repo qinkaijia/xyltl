@@ -7,7 +7,7 @@ SensorData/SystemState
   -> RuleEngine
   -> TaskClassifier
   -> ModelRouter
-  -> MultiLLMAnalyzer(real LLM or mock fallback)
+  -> MultiLLMAnalyzer(real LLM or explicit error / mock debug)
   -> JudgeModel
   -> SafetyGuard
   -> runtime/system_status.json
@@ -24,7 +24,7 @@ python modules/analyzer/src/main.py
 传入模拟数据：
 
 ```bash
-python modules/analyzer/src/main.py --input-json "{\"device_id\":\"device_002\",\"temperature\":80,\"humidity\":50,\"gas\":0.2,\"vibration\":1.0,\"current\":2.0,\"cloud_connected\":true,\"sensor_online\":true}"
+python modules/analyzer/src/main.py --input-json "{\"device_id\":\"device_002\",\"temperature\":80,\"humidity\":50,\"gas\":0.65,\"cloud_connected\":true,\"sensor_online\":true}"
 ```
 
 输出文件：
@@ -83,11 +83,11 @@ QWEN_API_KEY / QWEN_API_URL / QWEN_MODEL
 `ANALYZER_LLM_TIMEOUT` 可设置请求超时时间，默认 30 秒。
 `ANALYZER_OUTPUT_PATH` 可覆盖 analyzer 输出 JSON 路径；相对路径按仓库根目录解析。
 
-## 回退策略
+## 真实/Mock 策略
 
-- `ANALYZER_USE_REAL_LLM` 未开启时，全部使用 mock。
-- 密钥、URL 或模型名缺失时，该 provider 自动回退 mock。
-- HTTP、网络、JSON 解析失败时，该 provider 自动回退 mock，并在 `_debug.model_results[].error` 中记录原因。
+- `ANALYZER_USE_REAL_LLM` 未开启时，使用 mock，方便离线开发和板端无网调试。
+- `ANALYZER_USE_REAL_LLM=true` 时，只调用真实 provider。密钥、URL、模型名、HTTP、网络或 JSON 解析失败时，不再生成 `*_mock` 结果。
+- 真实 provider 失败会在 `_debug.model_results[].error` 中记录原因，`analysis_mode` 会进入 `llm_unavailable_rule_fallback` 或规则兜底状态。
 - SafetyGuard 会保证云端模型不能降低本地规则判定出的报警等级。
 
 ## 龙芯板端联调记录
@@ -110,7 +110,7 @@ python -m pytest modules/analyzer/tests
 
 ## 常见问题
 
-- 返回 `已回退 mock`：检查 `ANALYZER_USE_REAL_LLM=true`、API Key、URL、模型名和网络。
+- 返回 `llm_unavailable_rule_fallback` 或 `debug.model_results[].error`：检查 `ANALYZER_USE_REAL_LLM=true`、API Key、URL、模型名和网络。
 - 返回 HTTP 401/403：通常是密钥、权限或模型服务未开通。
 - 返回模型不存在：确认供应商控制台里的模型 ID 与 `.env` 一致。
-- 输出不是 JSON：当前 prompt 已要求 JSON；若某模型仍返回解释文本，会自动回退 mock，可先用 `--force-model` 单独调试该模型。
+- 输出不是 JSON：当前 prompt 已要求 JSON；若某模型仍返回解释文本，会记录错误并使用本地规则兜底，可先用 `--force-model` 单独调试该模型。

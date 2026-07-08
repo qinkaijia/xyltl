@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.command import Command
 from app.schemas.command import CommandCreate, CommandRead, CommandResult
-from app.services import command_service, device_service
+from app.services import command_service, device_service, mqtt_control_service
 
 
 router = APIRouter(prefix="/commands", tags=["commands"])
@@ -15,7 +15,19 @@ def create_command(payload: CommandCreate, db: Session = Depends(get_db)):
     if not device_service.get_device(db, payload.device_id):
         device_service.ensure_device(db, payload.device_id)
         db.commit()
-    return command_service.create_command(db, payload)
+    command = command_service.create_command(db, payload)
+    delivery = mqtt_control_service.dispatch_to_2k0301(payload, command.command_id)
+    if delivery is None:
+        return command
+
+    command = command_service.apply_delivery_result(db, command, delivery)
+    return {
+        **CommandRead.model_validate(command).model_dump(),
+        "delivery_status": delivery.get("status"),
+        "delivery_elapsed_ms": delivery.get("elapsed_ms"),
+        "ack": delivery.get("ack"),
+        "transport_error": delivery.get("error"),
+    }
 
 
 @router.get("/pending/{device_id}", response_model=list[CommandRead])

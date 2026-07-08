@@ -63,12 +63,13 @@ def run_demo(input_data: dict, force_model: str = "") -> dict:
     )
     judge_result = JudgeModel().judge(sensor_data, system_state, rule_result, model_results)
     analysis_mode = _analysis_mode(router_decision.selected_models, model_results)
+    llm_available = any(item.error is None for item in model_results)
     final_status = SafetyGuard().enforce(
         judge_result=judge_result,
         rule_result=rule_result,
         sensor_data=sensor_data,
         system_state=system_state,
-        llm_available=bool(router_decision.selected_models),
+        llm_available=llm_available,
         analysis_mode=analysis_mode,
     )
     OutputWriter(output_path).write(final_status)
@@ -99,7 +100,17 @@ def _analysis_mode(selected_models: list[str], model_results: list) -> str:
         item.error is None and item.model_name not in ("mock", "rule_fallback") and not item.model_name.endswith("_mock")
         for item in model_results
     )
-    return "real_multi_llm" if has_real_success else "mock_multi_llm"
+    if has_real_success:
+        return "real_multi_llm"
+    has_mock_success = any(
+        item.error is None and (item.model_name in ("mock", "rule_fallback") or item.model_name.endswith("_mock"))
+        for item in model_results
+    )
+    if has_mock_success:
+        return "mock_multi_llm"
+    if any(item.error for item in model_results):
+        return "llm_unavailable_rule_fallback"
+    return "rule_fallback"
 
 
 def parse_args() -> argparse.Namespace:

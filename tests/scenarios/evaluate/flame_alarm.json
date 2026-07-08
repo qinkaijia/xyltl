@@ -1,0 +1,24 @@
+{
+  "name": "flame_alarm",
+  "request": {
+    "device_id": "scenario_flame_alarm",
+    "metrics": {
+      "temperature": 43.0,
+      "humidity": 41.0,
+      "tvoc": 900,
+      "eco2": 1200,
+      "mq3_value": 0.18,
+      "flame_detected": true,
+      "risk_score": 92
+    },
+    "system_state": {
+      "cloud_connected": true,
+      "voice_state": "idle",
+      "sensor_online": true
+    },
+    "include_debug": true
+  },
+  "expected": {
+    "alarm_level": 2
+  }
+}

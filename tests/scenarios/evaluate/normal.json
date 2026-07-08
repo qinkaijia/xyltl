@@ -3,11 +3,13 @@
   "request": {
     "device_id": "scenario_normal",
     "metrics": {
-      "temperature": 30.0,
-      "humidity": 50.0,
-      "gas": 0.1,
-      "vibration": 0.5,
-      "current": 1.0
+      "temperature": 25.0,
+      "humidity": 55.0,
+      "tvoc": 120,
+      "eco2": 450,
+      "mq3_value": 0.123,
+      "flame_detected": false,
+      "risk_score": 0
     },
     "system_state": {
       "cloud_connected": true,

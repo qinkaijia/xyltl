@@ -70,6 +70,7 @@ def evaluate_with_fallback(client: SafeCloudClient, payload: Dict[str, Any]) -> 
             "elapsed_ms": int((time.time() - started) * 1000),
             "base_url": client.base_url,
         }
+        enrich_final_status_with_2k0301_fields(response, payload)
         return response
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
         return {
@@ -168,7 +169,7 @@ def local_fallback_status(payload: Dict[str, Any], error: str = "") -> Dict[str,
     )
     status_text = {0: "正常", 1: "预警", 2: "报警"}.get(level, "未知")
     voice_text = f"当前设备处于{status_text}状态。{reason}。{suggestion}"
-    return {
+    status = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "device_id": payload.get("device_id", "2k1000la"),
         "alarm_level": level,
@@ -194,44 +195,77 @@ def local_fallback_status(payload: Dict[str, Any], error: str = "") -> Dict[str,
         "client_error": error,
         "rule_hits": hits,
     }
+    status.update(extract_2k0301_fields(payload))
+    return status
+
+
+def enrich_final_status_with_2k0301_fields(response: Dict[str, Any], payload: Dict[str, Any]) -> None:
+    final_status = response.get("final_status")
+    if isinstance(final_status, dict):
+        final_status.update(extract_2k0301_fields(payload))
+
+
+def extract_2k0301_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
+    metrics = payload.get("metrics") or {}
+    state = payload.get("system_state") or {}
+    fields = {
+        "tvoc": number(metrics.get("tvoc", state.get("raw_tvoc")), 0.0),
+        "eco2": number(metrics.get("eco2", state.get("raw_eco2")), 0.0),
+        "mq3_value": number(metrics.get("mq3_value", state.get("raw_mq3_value")), 0.0),
+        "flame_detected": bool(metrics.get("flame_detected", state.get("flame_detected", False))),
+        "risk_score": number(metrics.get("risk_score", state.get("raw_risk_score")), 0.0),
+        "sensor_online": bool(state.get("sensor_online", True)),
+        "actuator_online": bool(state.get("actuator_online", True)),
+        "sensor_source": state.get("source", ""),
+    }
+    fields["sensor_metrics"] = {
+        "temperature": number(metrics.get("temperature"), 0.0),
+        "humidity": number(metrics.get("humidity"), 0.0),
+        "tvoc": fields["tvoc"],
+        "eco2": fields["eco2"],
+        "mq3_value": fields["mq3_value"],
+        "flame_detected": fields["flame_detected"],
+        "risk_score": fields["risk_score"],
+    }
+    return fields
 
 
 def local_rule_evaluate(metrics: Dict[str, Any], state: Dict[str, Any]) -> Tuple[int, str, list[str]]:
     level = 0
     reasons = []
     hits = []
+    sensor_online = state.get("sensor_online", True) is not False
 
-    if state.get("sensor_online", True) is False:
+    if not sensor_online:
         level = 2
         hits.append("SENSOR_OFFLINE")
         reasons.append("传感器离线，无法确认现场状态")
 
-    checks = [
-        ("temperature", "温度", 60.0, 75.0),
-        ("gas", "气体浓度", 0.3, 0.6),
-        ("vibration", "振动", 1.5, 2.5),
-        ("current", "电流", 3.0, 5.0),
-    ]
-    for key, label, warning, alarm in checks:
-        value = number(metrics.get(key), 0.0)
-        if value >= alarm:
-            level = max(level, 2)
-            hits.append(f"{key.upper()}_ALARM")
-            reasons.append(f"{label}达到报警阈值：{value}")
-        elif value >= warning:
-            level = max(level, 1)
-            hits.append(f"{key.upper()}_WARNING")
-            reasons.append(f"{label}达到预警阈值：{value}")
+    if sensor_online:
+        checks = [
+            ("temperature", "温度", 60.0, 75.0),
+            ("gas", "气体浓度", 0.3, 0.6),
+        ]
+        for key, label, warning, alarm in checks:
+            value = number(metrics.get(key), 0.0)
+            if value >= alarm:
+                level = max(level, 2)
+                hits.append(f"{key.upper()}_ALARM")
+                reasons.append(f"{label}达到报警阈值：{value}")
+            elif value >= warning:
+                level = max(level, 1)
+                hits.append(f"{key.upper()}_WARNING")
+                reasons.append(f"{label}达到预警阈值：{value}")
 
-    humidity = number(metrics.get("humidity"), 0.0)
-    if humidity <= 10.0 or humidity >= 90.0:
-        level = max(level, 2)
-        hits.append("HUMIDITY_ALARM")
-        reasons.append(f"湿度达到报警范围：{humidity}")
-    elif humidity <= 20.0 or humidity >= 80.0:
-        level = max(level, 1)
-        hits.append("HUMIDITY_WARNING")
-        reasons.append(f"湿度达到预警范围：{humidity}")
+        humidity = number(metrics.get("humidity"), 0.0)
+        if humidity <= 10.0 or humidity >= 90.0:
+            level = max(level, 2)
+            hits.append("HUMIDITY_ALARM")
+            reasons.append(f"湿度达到报警范围：{humidity}")
+        elif humidity <= 20.0 or humidity >= 80.0:
+            level = max(level, 1)
+            hits.append("HUMIDITY_WARNING")
+            reasons.append(f"湿度达到预警范围：{humidity}")
 
     if not reasons:
         reasons.append("所有关键指标处于正常范围")

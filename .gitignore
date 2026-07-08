@@ -45,6 +45,7 @@ PCB设计_极简版.md
 
 # Logs and runtime artifacts
 logs/archive/
+runtime/
 *.log
 *.tmp
 *.db

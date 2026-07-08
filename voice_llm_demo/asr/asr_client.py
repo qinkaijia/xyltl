@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import os
+import sys
 import time
 from urllib.parse import urlencode
 import urllib.error
@@ -32,8 +33,17 @@ class ASRClient:
 
     def _fallback_manual(self, audio_path: str, reason: str) -> str:
         print("ASR 自动识别不可用：{}".format(reason))
-        print("已回退到 manual 手动输入模式。")
-        return self._manual_transcribe(audio_path)
+        fallback_enabled = os.environ.get("ASR_FALLBACK_MANUAL", "true").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if fallback_enabled and sys.stdin.isatty():
+            print("已回退到 manual 手动输入模式。")
+            return self._manual_transcribe(audio_path)
+        print("当前为非交互模式，跳过手动输入，请重新说一遍或检查 ASR 配置。")
+        return ""
 
     def _baidu_transcribe(self, audio_path: str) -> str:
         api_key = os.environ.get(config.BAIDU_API_KEY_ENV)

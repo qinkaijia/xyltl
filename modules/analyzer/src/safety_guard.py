@@ -49,7 +49,7 @@ class SafetyGuard:
             cloud_connected=system_state.cloud_connected,
             need_cloud_upload=rule_result.need_cloud_upload or level > 0,
             need_voice_alert=rule_result.need_voice_alert or level > 0,
-            analysis_mode=analysis_mode if llm_available else "rule_fallback",
+            analysis_mode=analysis_mode if analysis_mode else ("mock_multi_llm" if llm_available else "rule_fallback"),
             source={
                 "rule_engine": True,
                 "llm_analyzer": llm_available,

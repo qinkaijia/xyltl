@@ -5,12 +5,21 @@ from typing import Dict, Optional, Tuple
 from .device_state import DeviceState
 
 
+HARDWARE_INTENTS = {"FAN_CONTROL", "BUZZER_CONTROL", "ALARM_LIGHT", "DEVICE_RESET"}
+
+
 class CommandDispatcher:
-    def __init__(self, device_state: DeviceState) -> None:
+    def __init__(self, device_state: DeviceState, mqtt_executor=None) -> None:
         self.device_state = device_state
+        self.mqtt_executor = mqtt_executor
 
     def execute(self, intent: str, params: Optional[Dict] = None) -> Tuple[bool, str]:
-        _ = params or {}
+        params = params or {}
+        if intent in HARDWARE_INTENTS:
+            if self.mqtt_executor is not None:
+                return self.mqtt_executor.execute(intent, params)
+            return True, f"模拟执行硬件命令：{intent} {params}"
+
         if intent == "START_DETECTION":
             self.device_state.detecting = True
             self.device_state.uploaded = False

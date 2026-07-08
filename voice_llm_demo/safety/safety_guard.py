@@ -11,9 +11,15 @@ class SafetyGuard:
         "QUERY_SENSOR_DATA",
         "QUERY_ALARM",
         "EXPLAIN_ALARM",
+        "GENERAL_QA",
+        "LLM_UNAVAILABLE",
         "UPLOAD_DATA",
         "GENERATE_REPORT",
         "RETURN_HOME",
+        "FAN_CONTROL",
+        "BUZZER_CONTROL",
+        "ALARM_LIGHT",
+        "DEVICE_RESET",
         "UNSUPPORTED",
     }
     DANGEROUS_INTENTS = {
@@ -22,6 +28,7 @@ class SafetyGuard:
         "RESET_DEVICE",
         "SHUTDOWN_SYSTEM",
         "DELETE_HISTORY",
+        "DEVICE_RESET",
     }
     REQUIRED_FIELDS = {"type", "intent", "need_execute", "need_confirm", "params", "reply"}
 
@@ -42,6 +49,13 @@ class SafetyGuard:
 
         if intent in self.DANGEROUS_INTENTS and not llm_result.get("need_confirm"):
             return False, f"{intent} 是危险命令，必须二次确认。"
+
+        params = llm_result.get("params") or {}
+        if intent in {"FAN_CONTROL", "BUZZER_CONTROL", "ALARM_LIGHT"}:
+            state = str(params.get("state") or "").lower()
+            mode = str(params.get("mode") or "").lower()
+            if (state == "off" or mode == "off") and not llm_result.get("need_confirm"):
+                return False, f"{intent} 关闭动作需要二次确认。"
 
         return True, "安全校验通过。"
 

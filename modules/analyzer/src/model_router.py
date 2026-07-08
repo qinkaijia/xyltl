@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
+from llm_clients.base_client import real_llm_enabled
 from models import RouterDecision, RuleResult
 
 
@@ -91,6 +92,8 @@ class ModelRouter:
             return RouterDecision([], self._judge_model(), "当前为正常状态，无需调用大模型。")
 
         if not network_state:
+            if real_llm_enabled():
+                return RouterDecision([], self._judge_model(), "网络不可用，真实 LLM 无法调用，使用规则兜底。")
             return RouterDecision(["mock"], "mock", "网络不可用，降级使用 mock 模型。")
 
         max_models = int(router_config.get("max_models", 0))
@@ -102,7 +105,7 @@ class ModelRouter:
             if len(selected) >= max_models:
                 break
 
-        if not selected and self.config["models"].get("mock", {}).get("enabled", True):
+        if not selected and not real_llm_enabled() and self.config["models"].get("mock", {}).get("enabled", True):
             selected = ["mock"]
 
         return RouterDecision(

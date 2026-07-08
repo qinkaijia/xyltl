@@ -4,10 +4,12 @@
     "device_id": "scenario_temperature_warning",
     "metrics": {
       "temperature": 65.0,
-      "humidity": 50.0,
-      "gas": 0.1,
-      "vibration": 0.5,
-      "current": 1.0
+      "humidity": 52.0,
+      "tvoc": 180,
+      "eco2": 620,
+      "mq3_value": 0.08,
+      "flame_detected": false,
+      "risk_score": 35
     },
     "system_state": {
       "cloud_connected": true,

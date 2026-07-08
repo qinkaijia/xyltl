@@ -22,9 +22,61 @@ static QString valueText(const QJsonObject &obj, const QString &key, const QStri
         return QString::number(value.toDouble(), 'f', 2);
     }
     if (value.isBool()) {
-        return value.toBool() ? QStringLiteral("true") : QStringLiteral("false");
+        return value.toBool() ? QStringLiteral("是") : QStringLiteral("否");
     }
     return fallback;
+}
+
+static QJsonValue sensorValue(const QJsonObject &status, const QString &key)
+{
+    const QJsonObject sensor = status.value(QStringLiteral("sensor_metrics")).toObject();
+    if (sensor.contains(key)) {
+        return sensor.value(key);
+    }
+    return status.value(key);
+}
+
+static double sensorNumber(const QJsonObject &status, const QString &key, double fallback = 0.0)
+{
+    const QJsonValue value = sensorValue(status, key);
+    if (value.isBool()) {
+        return fallback;
+    }
+    if (value.isDouble()) {
+        return value.toDouble();
+    }
+    if (value.isString()) {
+        bool ok = false;
+        const double number = value.toString().toDouble(&ok);
+        return ok ? number : fallback;
+    }
+    return fallback;
+}
+
+static bool sensorBool(const QJsonObject &status, const QString &key, bool fallback = false)
+{
+    const QJsonValue value = sensorValue(status, key);
+    if (value.isBool()) {
+        return value.toBool();
+    }
+    if (value.isDouble()) {
+        return value.toDouble() != 0.0;
+    }
+    if (value.isString()) {
+        const QString text = value.toString().trimmed().toLower();
+        if (text == QStringLiteral("true") || text == QStringLiteral("1") || text == QStringLiteral("yes")) {
+            return true;
+        }
+        if (text == QStringLiteral("false") || text == QStringLiteral("0") || text == QStringLiteral("no")) {
+            return false;
+        }
+    }
+    return fallback;
+}
+
+static QString flameText(bool detected)
+{
+    return detected ? QStringLiteral("检测到火焰") : QStringLiteral("未检测到火焰");
 }
 
 static QString textArray(const QJsonValue &value)
@@ -69,6 +121,18 @@ static QString buildModelDetails(const QJsonObject &root, const QJsonObject &sta
     lines.append(QStringLiteral("分析模式：%1").arg(valueText(status, QStringLiteral("analysis_mode"))));
     lines.append(QStringLiteral("原因：%1").arg(valueText(status, QStringLiteral("reason"))));
     lines.append(QStringLiteral("建议：%1").arg(valueText(status, QStringLiteral("suggestion"))));
+    lines.append(QString());
+    lines.append(QStringLiteral("2K0301 传感器"));
+    lines.append(QStringLiteral("温度：%1 ℃  湿度：%2 %RH")
+                     .arg(sensorNumber(status, QStringLiteral("temperature")), 0, 'f', 1)
+                     .arg(sensorNumber(status, QStringLiteral("humidity")), 0, 'f', 1));
+    lines.append(QStringLiteral("TVOC：%1 ppb  eCO2：%2 ppm  MQ-3：%3 mg/L")
+                     .arg(sensorNumber(status, QStringLiteral("tvoc")), 0, 'f', 0)
+                     .arg(sensorNumber(status, QStringLiteral("eco2")), 0, 'f', 0)
+                     .arg(sensorNumber(status, QStringLiteral("mq3_value")), 0, 'f', 3));
+    lines.append(QStringLiteral("火焰检测：%1  综合风险：%2/100")
+                     .arg(flameText(sensorBool(status, QStringLiteral("flame_detected"))))
+                     .arg(sensorNumber(status, QStringLiteral("risk_score")), 0, 'f', 0));
 
     const QJsonObject debug = root.value(QStringLiteral("debug")).toObject();
     if (debug.isEmpty()) {
@@ -158,8 +222,8 @@ static QString buildModelDetails(const QJsonObject &root, const QJsonObject &sta
     return lines.join(QStringLiteral("\n"));
 }
 
-FinalStatusDataProvider::FinalStatusDataProvider(const QString &statusFile, QObject *parent)
-    : IDataProvider(parent), m_statusFile(statusFile)
+FinalStatusDataProvider::FinalStatusDataProvider(const QString &statusFile, const QString &voiceFile, QObject *parent)
+    : IDataProvider(parent), m_statusFile(statusFile), m_voiceFile(voiceFile)
 {
     m_timer = new QTimer(this);
     m_timer->setInterval(kPollIntervalMs);
@@ -187,13 +251,21 @@ void FinalStatusDataProvider::poll()
     if (!info.exists() || !info.isFile()) {
         return;
     }
-    if (info.lastModified() == m_lastModified) {
+    QFileInfo voiceInfo(m_voiceFile);
+    const bool voiceChanged = !m_voiceFile.isEmpty()
+        && voiceInfo.exists()
+        && voiceInfo.isFile()
+        && voiceInfo.lastModified() != m_lastVoiceModified;
+    if (info.lastModified() == m_lastModified && !voiceChanged) {
         return;
     }
 
     SystemStatus status;
     if (loadStatus(&status)) {
         m_lastModified = info.lastModified();
+        if (voiceInfo.exists() && voiceInfo.isFile()) {
+            m_lastVoiceModified = voiceInfo.lastModified();
+        }
         emit statusUpdated(status);
     }
 }
@@ -217,18 +289,26 @@ bool FinalStatusDataProvider::loadStatus(SystemStatus *status)
     }
 
     status->deviceId = obj.value(QStringLiteral("device_id")).toString();
-    status->temperature = obj.value(QStringLiteral("temperature")).toDouble();
-    status->humidity = obj.value(QStringLiteral("humidity")).toDouble();
+    status->temperature = sensorNumber(obj, QStringLiteral("temperature"));
+    status->humidity = sensorNumber(obj, QStringLiteral("humidity"));
     status->gasValue = obj.value(QStringLiteral("gas")).toDouble();
     status->vibrationValue = obj.value(QStringLiteral("vibration")).toDouble();
     status->currentValue = obj.value(QStringLiteral("current")).toDouble();
+    status->tvoc = sensorNumber(obj, QStringLiteral("tvoc"));
+    status->eco2 = sensorNumber(obj, QStringLiteral("eco2"));
+    status->mq3Value = sensorNumber(obj, QStringLiteral("mq3_value"));
+    status->flameDetected = sensorBool(obj, QStringLiteral("flame_detected"));
+    status->riskScore = sensorNumber(obj, QStringLiteral("risk_score"));
     status->alarmLevel = obj.value(QStringLiteral("alarm_level")).toInt(LEVEL_NORMAL);
     status->statusText = obj.value(QStringLiteral("status_text")).toString(levelToText(status->alarmLevel));
     status->cloudConnected = obj.value(QStringLiteral("cloud_connected")).toBool(true);
+    status->sensorOnline = obj.value(QStringLiteral("sensor_online")).toBool(true);
+    status->actuatorOnline = obj.value(QStringLiteral("actuator_online")).toBool(true);
     status->alarmMessage = obj.value(QStringLiteral("reason")).toString();
     status->suggestion = obj.value(QStringLiteral("suggestion")).toString();
     status->voiceText = obj.value(QStringLiteral("voice_text")).toString();
     status->analysisMode = obj.value(QStringLiteral("analysis_mode")).toString();
+    status->sensorSource = obj.value(QStringLiteral("sensor_source")).toString();
     status->modelDetails = buildModelDetails(root, obj);
     if (root.value(QStringLiteral("debug")).isObject()) {
         const QJsonObject debug = root.value(QStringLiteral("debug")).toObject();
@@ -259,7 +339,61 @@ bool FinalStatusDataProvider::loadStatus(SystemStatus *status)
 
     status->gasLevel = levelFromHighThreshold(status->gasValue, 0.3, 0.6);
     status->vibrationLevel = levelFromHighThreshold(status->vibrationValue, 1.5, 2.5);
+    status->tvocLevel = levelFromHighThreshold(status->tvoc, 600.0, 2000.0);
+    status->eco2Level = levelFromHighThreshold(status->eco2, 1000.0, 2000.0);
+    status->mq3Level = levelFromHighThreshold(status->mq3Value, 0.3, 0.8);
+    status->flameLevel = status->flameDetected ? LEVEL_ALARM : LEVEL_NORMAL;
+    status->riskLevel = levelFromHighThreshold(status->riskScore, 30.0, 60.0);
+    loadVoiceStatus(status);
     return true;
+}
+
+void FinalStatusDataProvider::loadVoiceStatus(SystemStatus *status)
+{
+    if (m_voiceFile.isEmpty()) {
+        return;
+    }
+    QFile file(m_voiceFile);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return;
+    }
+    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isObject()) {
+        return;
+    }
+    const QJsonObject obj = doc.object();
+    const QString state = obj.value(QStringLiteral("state")).toString(QStringLiteral("idle"));
+    status->voiceState = voiceStateFromText(state);
+    status->assistantStateText = obj.value(QStringLiteral("state_text")).toString(voiceStateToText(status->voiceState));
+    status->assistantUserText = obj.value(QStringLiteral("last_user_text")).toString();
+    status->assistantReply = obj.value(QStringLiteral("last_reply")).toString();
+    status->assistantIntent = obj.value(QStringLiteral("last_intent")).toString();
+    status->assistantSafetyMessage = obj.value(QStringLiteral("safety_message")).toString();
+    status->assistantExecuteMessage = obj.value(QStringLiteral("execute_message")).toString();
+    status->assistantProvider = obj.value(QStringLiteral("llm_provider")).toString();
+}
+
+int FinalStatusDataProvider::voiceStateFromText(const QString &state)
+{
+    if (state == QStringLiteral("listening") || state == QStringLiteral("recognizing")) {
+        return VOICE_LISTENING;
+    }
+    if (state == QStringLiteral("thinking")) {
+        return VOICE_THINKING;
+    }
+    if (state == QStringLiteral("executing")) {
+        return VOICE_EXECUTING;
+    }
+    if (state == QStringLiteral("speaking")) {
+        return VOICE_SPEAKING;
+    }
+    if (state == QStringLiteral("error")) {
+        return VOICE_ERROR;
+    }
+    if (state == QStringLiteral("awake")) {
+        return VOICE_AWAKE;
+    }
+    return VOICE_IDLE;
 }
 
 int FinalStatusDataProvider::levelFromHighThreshold(double value, double warning, double alarm)

@@ -28,11 +28,12 @@ class RuleEngine:
             hits.append("SENSOR_OFFLINE")
             reasons.append("传感器离线，无法确认现场状态")
 
-        level = max(level, self._check_high("temperature", sensor_data.temperature, hits, reasons, "温度"))
-        level = max(level, self._check_range("humidity", sensor_data.humidity, hits, reasons, "湿度"))
-        level = max(level, self._check_high("gas", sensor_data.gas, hits, reasons, "气体浓度"))
-        level = max(level, self._check_high("vibration", sensor_data.vibration, hits, reasons, "振动"))
-        level = max(level, self._check_high("current", sensor_data.current, hits, reasons, "电流"))
+        if system_state.sensor_online:
+            level = max(level, self._check_high("temperature", sensor_data.temperature, hits, reasons, "温度"))
+            level = max(level, self._check_range("humidity", sensor_data.humidity, hits, reasons, "湿度"))
+            level = max(level, self._check_high("gas", sensor_data.gas, hits, reasons, "气体浓度"))
+            level = max(level, self._check_high("vibration", sensor_data.vibration, hits, reasons, "振动"))
+            level = max(level, self._check_high("current", sensor_data.current, hits, reasons, "电流"))
 
         if not system_state.cloud_connected:
             hits.append("CLOUD_DISCONNECTED")

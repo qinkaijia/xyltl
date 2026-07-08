@@ -29,6 +29,16 @@ class Settings:
             "voltage": float(os.getenv("SAFECLOUD_THRESHOLD_VOLTAGE", "250")),
             "current": float(os.getenv("SAFECLOUD_THRESHOLD_CURRENT", "20")),
         }
+        self.mqtt_control_enabled = os.getenv("SAFECLOUD_MQTT_CONTROL_ENABLED", "").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        self.mqtt_control_host = os.getenv("SAFECLOUD_2K0301_MQTT_HOST", "").strip()
+        self.mqtt_control_port = int(os.getenv("SAFECLOUD_2K0301_MQTT_PORT", "1883"))
+        self.mqtt_control_qos = int(os.getenv("SAFECLOUD_2K0301_MQTT_QOS", "1"))
+        self.mqtt_control_ack_timeout = float(os.getenv("SAFECLOUD_2K0301_ACK_TIMEOUT", "3.0"))
 
 
 @lru_cache

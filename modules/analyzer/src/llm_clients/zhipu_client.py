@@ -19,6 +19,4 @@ class ZhipuClient(BaseLLMClient):
                 return super().analyze(input_data, role)
             raise RuntimeError(self.unavailable_reason())
         except Exception as exc:
-            result = self.fallback.analyze(input_data, role)
-            result["error"] = f"智谱真实 API 调用失败，已回退 mock: {exc}"
-            return result
+            return self.error_result(input_data, role, f"智谱真实 API 调用失败: {exc}")

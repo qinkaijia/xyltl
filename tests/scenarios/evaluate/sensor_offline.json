@@ -3,11 +3,13 @@
   "request": {
     "device_id": "scenario_sensor_offline",
     "metrics": {
-      "temperature": 30.0,
-      "humidity": 50.0,
-      "gas": 0.1,
-      "vibration": 0.5,
-      "current": 1.0
+      "temperature": 0.0,
+      "humidity": 0.0,
+      "tvoc": 0,
+      "eco2": 0,
+      "mq3_value": 0,
+      "flame_detected": false,
+      "risk_score": 0
     },
     "system_state": {
       "cloud_connected": true,

@@ -1,7 +1,7 @@
 #ifndef __LQ_SGP30_HPP__
 #define __LQ_SGP30_HPP__
 
-#include "lq_drv_inc.hpp"
+#include "lq_fs_i2c.hpp"
 
 /****************************************************************************************************
  * @brief   SGP30 空气质量传感器类，硬件 I2C 驱动

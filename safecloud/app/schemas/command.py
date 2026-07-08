@@ -25,5 +25,9 @@ class CommandRead(BaseModel):
     sent_at: datetime | None = None
     executed_at: datetime | None = None
     result_message: str | None = None
+    delivery_status: str | None = None
+    delivery_elapsed_ms: int | None = None
+    ack: dict[str, Any] | None = None
+    transport_error: str | dict[str, Any] | None = None
 
     model_config = {"from_attributes": True}

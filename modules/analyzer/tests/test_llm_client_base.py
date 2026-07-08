@@ -47,5 +47,7 @@ def test_provider_records_error_when_real_llm_enabled_but_missing_config(monkeyp
         }
     }
     result = DeepSeekClient().analyze(payload, "engineering_diagnosis")
-    assert result["model_name"] == "deepseek_mock"
-    assert "已回退 mock" in result["error"]
+    assert result["model_name"] == "deepseek"
+    assert result["confidence"] == 0.0
+    assert "真实 API 调用失败" in result["error"]
+    assert "已回退 mock" not in result["error"]

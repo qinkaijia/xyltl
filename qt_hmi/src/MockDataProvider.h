@@ -24,6 +24,11 @@ private:
     double m_humidity = 55.0;
     double m_gas = 0.12;
     double m_vibration = 0.5;
+    double m_tvoc = 120.0;
+    double m_eco2 = 450.0;
+    double m_mq3Value = 0.12;
+    double m_riskScore = 8.0;
+    bool m_flameDetected = false;
     bool m_cloud = true;
 };
 

@@ -84,11 +84,13 @@
 {
   "device_id": "board_2k1000la",
   "metrics": {
-    "temperature": 72.5,
-    "humidity": 61.0,
-    "gas": 0.25,
-    "vibration": 1.82,
-    "current": 2.3
+    "temperature": 31.0,
+    "humidity": 58.0,
+    "tvoc": 2600,
+    "eco2": 2400,
+    "mq3_value": 0.86,
+    "flame_detected": false,
+    "risk_score": 78
   },
   "system_state": {
     "cloud_connected": true,
@@ -103,8 +105,8 @@
 
 字段说明：
 
-- `metrics`：端侧标准化后的传感器指标。
-- `use_real_llm`：`false` 时强制 mock，`true` 时允许调用真实 API。
+- `metrics`：端侧标准化后的传感器指标。301 当前主字段为 `temperature/humidity/tvoc/eco2/mq3_value/flame_detected/risk_score`；`gas` 可由 2K1000LA 或 SafeCloud 根据这些字段归一化得到。
+- `use_real_llm`：`false` 时使用 mock 调试，`true` 时调用真实 API；真实 API 失败会显式写入 `debug.model_results[].error`，不会回退 mock 占位结果。
 - `force_model`：可选 `deepseek`、`kimi`、`zhipu`、`doubao`、`qwen`、`mock`，用于逐个供应商调试。
 - `include_debug`：是否返回路由、规则和模型输出调试信息。
 
@@ -116,6 +118,15 @@
     "device_id": "board_2k1000la",
     "alarm_level": 1,
     "status_text": "预警",
+    "sensor_metrics": {
+      "temperature": 31.0,
+      "humidity": 58.0,
+      "tvoc": 2600,
+      "eco2": 2400,
+      "mq3_value": 0.86,
+      "flame_detected": false,
+      "risk_score": 78
+    },
     "need_cloud_upload": true,
     "need_voice_alert": true,
     "analysis_mode": "mock_multi_llm"

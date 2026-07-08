@@ -3,7 +3,7 @@
 这是一个不依赖 Qt 的命令行版语音交互核心模块，用于在龙芯 2K1000LA 或 Linux 环境中跑通：
 
 ```text
-VAD 自动录音 -> ASRClient 识别文本 -> MockLLM 意图识别 -> SafetyGuard 安全校验 -> 模拟设备命令执行 -> 日志记录
+VAD 自动录音 -> ASRClient 识别文本 -> MockLLM 意图识别 -> SafetyGuard 安全校验 -> 模拟或 MQTT 设备命令执行 -> 日志记录
 ```
 
 当前支持三种 ASR 模式：
@@ -29,6 +29,7 @@ voice_llm_demo/
   device/
     device_state.py
     command_dispatcher.py
+    mqtt_executor.py
   safety/
     safety_guard.py
   data/recorded/
@@ -69,37 +70,147 @@ python3 main.py
 
 按 Enter 后程序会监听麦克风并自动录音，随后调用 `ASRClient.transcribe(audio_path)`。ASR 返回文本后，主流程继续交给 LLM、SafetyGuard 和 CommandDispatcher。
 
+## 接入真实 301 控制
+
+默认情况下命令仍然走模拟执行，便于离线调试。需要在 2K1000LA 上真实控制 301 时，增加 `--mqtt-control`：
+
+```bash
+cd ~/xylt
+PYTHONPATH=. python3 voice_llm_demo/main.py \
+  --manual-text 打开风扇 \
+  --assistant-state-file runtime/voice_assistant_state.json \
+  --context-status-file runtime/latest_evaluate_response.json \
+  --mqtt-control \
+  --mqtt-host 127.0.0.1 \
+  --mqtt-ack-timeout 5
+```
+
+常用验证语句：
+
+```text
+打开风扇
+打开蜂鸣器
+红灯闪烁
+```
+
+本轮板端联调结果：
+
+```text
+打开风扇   -> FAN_CONTROL    -> fan_control ACK 成功
+打开蜂鸣器 -> BUZZER_CONTROL -> buzzer_control ACK 成功
+红灯闪烁   -> ALARM_LIGHT    -> alarm_light ACK 成功
+```
+
+正式演示时可把 `--mqtt-control` 与 `--continuous` 组合使用；录音设备通过 `.env` 中的 `AUDIO_DEVICE=plughw:1,0` 指定。语音文本仍会经过 `SafetyGuard`，关闭类或高风险类动作会按安全策略要求确认或拒绝。
+
+## Qt 显示与大模型问答
+
+语音助手每轮都会写出状态文件，供 Qt HMI 的 `--voice-file` 读取：
+
+```bash
+runtime/voice_assistant_state.json
+```
+
+状态文件包含：
+
+```text
+state / state_text
+last_user_text
+last_reply
+last_intent
+safety_message
+execute_message
+llm_provider
+history
+```
+
+普通问答可接入真实大模型，硬件控制命令仍优先走本地规则和 SafetyGuard：
+
+```bash
+cd ~/xylt
+export VOICE_USE_REAL_LLM=true
+export VOICE_LLM_PROVIDER=doubao
+export DOUBAO_API_KEY="你的豆包 Key"
+export DOUBAO_API_URL="https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+export DOUBAO_MODEL="你的豆包模型名"
+
+PYTHONPATH=. python3 voice_llm_demo/main.py \
+  --manual-text 介绍一下这个系统 \
+  --assistant-state-file runtime/voice_assistant_state.json \
+  --context-status-file runtime/latest_evaluate_response.json \
+  --real-llm \
+  --llm-provider doubao \
+  --max-history-turns 4 \
+  --max-reply-chars 120
+```
+
+支持的 provider：
+
+```text
+qwen    -> QWEN_API_KEY / QWEN_API_URL / QWEN_MODEL
+doubao  -> DOUBAO_API_KEY / DOUBAO_API_URL / DOUBAO_MODEL
+deepseek -> DEEPSEEK_API_KEY / DEEPSEEK_API_URL / DEEPSEEK_MODEL
+kimi    -> KIMI_API_KEY / KIMI_API_URL / KIMI_MODEL
+zhipu   -> ZHIPU_API_KEY / ZHIPU_API_URL / ZHIPU_MODEL
+```
+
+上下文限制：
+
+```text
+VOICE_MAX_HISTORY_TURNS=4
+VOICE_MAX_QUESTION_CHARS=120
+VOICE_MAX_REPLY_CHARS=180
+VOICE_MAX_CONTEXT_CHARS=1600
+```
+
+这些限制用于控制传给模型的历史轮数、用户问题长度、设备状态上下文长度和最终语音回复长度，避免回答过长或泄露过多无关上下文。
+
+Qt HMI 默认会自动启动同一套语音进程，也可以用右上角“启动语音/停止语音”按钮手动控制。Qt 会读取 `voice_llm_demo/.env`，GUI 非交互模式会自动设置 `ASR_FALLBACK_MANUAL=false`，因此 ASR 失败时会提示重说，不会等待手动输入。若需要关闭自动启动，可在启动 Qt 前设置 `VOICE_AUTOSTART=false`。
+
+正式演示建议开启唤醒词和播报：
+
+```bash
+VOICE_AUTOSTART=true
+VOICE_WAKE_REQUIRED=true
+VOICE_WAKE_WORDS=小龙,你好小龙,龙芯助手,小龙在吗,在吗
+VOICE_WAKE_WINDOW_SECONDS=10
+VOICE_TTS_MODE=baidu
+VOICE_TTS_MAX_CHARS=120
+```
+
+连续监听时，说“你好小龙，介绍一下当前系统”会去掉唤醒词后进入 ASR/LLM 流程。只说“你好小龙”或“在吗”时，助手会播报“我在，请说”，并打开 `VOICE_WAKE_WINDOW_SECONDS` 秒唤醒窗口；窗口内下一句话无需重复唤醒词。每次回答完成后会继续延长同样的追问窗口，超过窗口时间未继续说话才结束对话。播报使用百度 TTS 生成 wav，再通过板端 `aplay` 播放。
+
 ## 持续监听真实收音
 
 正式演示时可使用持续监听模式，不再每轮按 Enter：
 
 ```bash
-python3 main.py --continuous --audio-device hw:1,0
+AUDIO_DEVICE=plughw:1,0 python3 main.py --continuous
 ```
 
 说明：
 
 - `--continuous` 会一直监听麦克风，VAD 检测到人声后自动录音、ASR、LLM 分析和安全校验。
-- `--audio-device` 对应 `arecord -l` 中的设备号；例如板端 USB 声卡常见为 `hw:1,0`。
-- 如果不传 `--audio-device`，使用系统默认录音设备。
+- `AUDIO_DEVICE` 对应 ALSA 设备名；板端 USB 声卡建议使用 `plughw:1,0`，让 ALSA 自动转换为 ASR 需要的 16k/16bit/单声道。
+- 如果不设置 `AUDIO_DEVICE`，使用系统默认录音设备。
 - 当前仍保留 manual ASR 兜底；未配置云端 ASR 时，录音完成后会要求手动输入识别文本。
 - 如果只想验证实时收音，不进入 ASR/LLM，可加 `--listen-only`：
 
 ```bash
-python3 main.py --continuous --listen-only --audio-device hw:1,0
+AUDIO_DEVICE=plughw:1,0 python3 main.py --continuous --listen-only
 ```
 
 现场噪声导致误触发时，可临时调高阈值：
 
 ```bash
 MIN_ABSOLUTE_THRESHOLD=800 THRESHOLD_RATIO=4.0 \
-  python3 main.py --continuous --listen-only --audio-device hw:1,0
+  AUDIO_DEVICE=plughw:1,0 python3 main.py --continuous --listen-only
 ```
 
 先做麦克风探针测试：
 
 ```bash
-python3 tools/audio_capture_probe.py --device hw:1,0 --seconds 2 --output data/recorded/probe.wav
+python3 tools/audio_capture_probe.py --device plughw:1,0 --seconds 2 --output data/recorded/probe.wav
 aplay data/recorded/probe.wav
 ```
 
@@ -121,6 +232,7 @@ ASR_MODE = "xfyun"
 
 ```bash
 ASR_MODE=baidu
+AUDIO_DEVICE=plughw:1,0
 BAIDU_API_KEY=你的百度API_KEY
 BAIDU_SECRET_KEY=你的百度SECRET_KEY
 XFYUN_APP_ID=你的讯飞APPID
@@ -183,7 +295,7 @@ python3 main.py
 wav / 16000 Hz / 16 bit / 单声道
 ```
 
-如果密钥缺失、网络失败或百度返回错误码，程序不会崩溃，会打印中文错误并回退到 manual 输入。
+如果密钥缺失、网络失败或百度返回错误码，程序不会崩溃。命令行交互模式会回退到 manual 输入；Qt/后台等非交互模式会返回空文本并提示重新说或检查配置，避免进程卡住。
 
 ## 讯飞 ASR 模式
 
@@ -213,13 +325,13 @@ python3 main.py
 - 中间帧：`status = 1`
 - 尾帧：`status = 2`
 
-如果密钥缺失、网络失败、WebSocket 连接失败或讯飞返回错误码，程序不会崩溃，会打印中文错误并回退到 manual 输入。
+如果密钥缺失、网络失败、WebSocket 连接失败或讯飞返回错误码，程序不会崩溃。命令行交互模式会回退到 manual 输入；Qt/后台等非交互模式会返回空文本并提示重新说或检查配置。
 
 ## 麦克风测试命令
 
 ```bash
 arecord -l
-python3 tools/audio_capture_probe.py --device hw:1,0 --seconds 2 --output data/recorded/probe.wav
+python3 tools/audio_capture_probe.py --device plughw:1,0 --seconds 2 --output data/recorded/probe.wav
 arecord -q -f S16_LE -r 16000 -c 1 -d 4 test.wav
 aplay test.wav
 python3 main.py
@@ -251,7 +363,7 @@ alsamixer
 
 ```bash
 python3 main.py --list-audio
-python3 main.py --continuous --audio-device hw:1,0
+AUDIO_DEVICE=plughw:1,0 python3 main.py --continuous
 ```
 
 ### 录音一直不停止
@@ -299,13 +411,9 @@ echo "$XFYUN_API_SECRET"
 - WebSocket 连接被网络环境拦截。
 - 音频格式不是 16k/16bit/单声道 PCM/wav。
 
-## 接入真实 LLM
+## 真实 LLM 输出结构
 
-当前 `LLMClient` 默认调用 `MockLLM`。后续接入真实 LLM 时：
-
-1. 将 `USE_REAL_LLM` 改为 `True`。
-2. 在 `llm/llm_client.py` 中把 `_analyze_http()` 对接真实 LLM 服务。
-3. 保持返回结构不变：
+`LLMClient` 已支持 Qwen、Doubao、DeepSeek、Kimi、Zhipu 的真实 Chat Completions 调用。普通问答会调用真实模型；硬件执行命令仍优先由本地 `MockLLM`/规则解析，以保证安全动作不依赖云端自由生成。真实模型和本地解析都保持同一返回结构：
 
 ```python
 {

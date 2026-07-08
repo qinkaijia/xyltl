@@ -181,7 +181,7 @@
                   <option value="normal">正常巡检</option>
                   <option value="temperature_warning">高温预警</option>
                   <option value="gas_alarm">气体报警</option>
-                  <option value="vibration_alarm">振动异常</option>
+                  <option value="flame_alarm">火焰报警</option>
                   <option value="sensor_offline">传感器离线</option>
                 </select>
               </label>
@@ -251,17 +251,18 @@
                 <label>
                   <span>命令类型</span>
                   <select id="commandType">
-                    <option value="fan_control">fan_control</option>
-                    <option value="alarm_light">alarm_light</option>
-                    <option value="buzzer_control">buzzer_control</option>
-                    <option value="device_reset">device_reset</option>
+                    <option value="fan_control">风机控制</option>
+                    <option value="alarm_light">报警灯控制</option>
+                    <option value="buzzer_control">蜂鸣器控制</option>
+                    <option value="device_reset">设备复位</option>
                   </select>
                 </label>
                 <label>
                   <span>参数 JSON</span>
-                  <textarea id="commandPayload" rows="4">{ "state": "on" }</textarea>
+                  <textarea id="commandPayload" rows="4">{ "state": "on", "speed": 60, "duration_ms": 1000 }</textarea>
                 </label>
                 <button class="primary-button" type="submit">下发命令</button>
+                <pre id="commandAck" class="command-ack empty-state">等待 ACK</pre>
               </form>
             </article>
           </section>

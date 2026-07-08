@@ -3,3 +3,4 @@ uvicorn[standard]>=0.27,<1.0
 SQLAlchemy>=2.0,<3.0
 pydantic>=2.6,<3.0
 requests>=2.31,<3.0
+paho-mqtt>=1.6,<3.0

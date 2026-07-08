@@ -1,4 +1,4 @@
-# 2K1000LA 与电脑端 SafeCloud 通信协议说明
+﻿# 2K1000LA 与电脑端 SafeCloud 通信协议说明
 
 本文档约定龙芯 2K1000LA 主控板与电脑端 SafeCloud 云端原型之间的通信方式。后续 2K0301 接入后，2K1000LA 仍按本文档把本地传感器数据或 301 上报数据转换为统一云端请求。
 
@@ -327,10 +327,10 @@ python3 app_2k1000la/cloud_client.py \
 
 | 项目 | 当前值 |
 | --- | --- |
-| 2K0301 IP | `192.168.43.39`，DHCP 动态获取 |
-| 2K1000LA IP | `192.168.43.40`，DHCP 动态获取 |
+| 2K0301 IP | `192.168.43.40`，DHCP 动态获取 |
+| 2K1000LA IP | `192.168.43.36`，DHCP 动态获取 |
 | MQTT Broker | 运行在 2K1000LA |
-| Broker 地址 | 301 侧连接 `192.168.43.40:1883`，2K1000LA 本地客户端连接 `127.0.0.1:1883` |
+| Broker 地址 | 301 侧连接 `192.168.43.36:1883`，2K1000LA 本地客户端连接 `127.0.0.1:1883` |
 | 认证 | 无用户名/密码 |
 | QoS | 全部 Topic 当前约定 QoS 1 |
 
@@ -338,11 +338,11 @@ Topic：
 
 | 方向 | Topic | 说明 |
 | --- | --- | --- |
-| 301 -> 1000LA | `device/2k0301/sensor` | 传感器数据，1 Hz |
-| 301 -> 1000LA | `device/2k0301/heartbeat` | 心跳，0.5 Hz |
-| 301 -> 1000LA | `device/2k0301/ack` | 命令 ACK |
-| 301 -> 1000LA | `device/2k0301/error` | 故障事件 |
-| 1000LA -> 301 | `device/2k0301/command` | 执行命令 |
+| 301 -> 1000LA | `device/board_2k0301/sensor` | 传感器数据，1 Hz |
+| 301 -> 1000LA | `device/board_2k0301/heartbeat` | 心跳，0.5 Hz |
+| 301 -> 1000LA | `device/board_2k0301/ack` | 命令 ACK |
+| 301 -> 1000LA | `device/board_2k0301/error` | 故障事件 |
+| 1000LA -> 301 | `device/board_2k0301/command` | 执行命令 |
 
 301 上报字段到云端字段的第一版映射：
 
@@ -397,6 +397,7 @@ MQTT 数据源本地转换命令：
 
 ```bash
 python3 app_2k1000la/cloud_client.py \
+  --base-url http://<电脑IP>:8010 \
   --sensor-source 2k0301 \
   --mqtt-host 127.0.0.1 \
   --mqtt-port 1883 \
@@ -415,14 +416,36 @@ python3 app_2k1000la/cloud_client.py \
 - Web 大屏 `http://<电脑IP>:8010/dashboard` 可打开
 - Qt HMI 使用 `--status-file runtime/latest_evaluate_response.json` 能显示同一状态
 
+本轮 2026-07-07 已验证：
+
+- Windows SafeCloud：`192.168.43.5:8010`
+- 2K1000LA：`192.168.43.36`
+- 2K0301/301：`192.168.43.40`
+- MQTT Broker：`192.168.43.36:1883`
+- 301 真实 topic：`device/board_2k0301/...`
+- 5 分钟链路测试写出 155 条 `evaluate_result`，输出文件为 `runtime/latest_evaluate_response.json`
+- SafeCloud `POST /api/commands` 已验证 `fan_control`、`buzzer_control`、`alarm_light` 均收到 301 `ack_ok`
+- 语音链路已验证 `打开风扇`、`打开蜂鸣器`、`红灯闪烁` 均完成 LLM -> SafetyGuard -> MQTT -> 301 ACK
+- 301 命令 payload 需保持 compact JSON，不要在 MQTT payload 中插入多余空格
+- Qt HMI offscreen 烟测命令：
+
+```bash
+cd ~/xylt/qt_hmi
+QT_QPA_PLATFORM=offscreen timeout 5 ./build_qmake/display_qt_app \
+  --compact \
+  --geometry 780x450+10+10 \
+  --status-file /home/xylt/xylt/runtime/latest_evaluate_response.json
+```
+
 ## 当前网络记录
 
 本轮用户报告：
 
 ```text
-2K1000LA: 192.168.43.40
-2K0301: 192.168.43.39
-MQTT Broker: 192.168.43.40:1883
+Windows SafeCloud: 192.168.43.5:8010
+2K1000LA: 192.168.43.36
+2K0301: 192.168.43.40
+MQTT Broker: 192.168.43.36:1883
 ```
 
 电脑端 IP 以实际 WLAN 地址为准。推荐通过 UDP discovery 或 `SAFECLOUD_BASE_URL` 传入，不在代码中写死。

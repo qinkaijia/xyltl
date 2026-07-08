@@ -4,36 +4,79 @@ const state = {
   apiBase: defaultApiBase(),
   activePage: getInitialPage(),
   summary: null,
+  latestEvaluation: null,
   devices: [],
   alarms: [],
   evaluateScenarios: {
     normal: {
-      device_id: "web_normal",
-      metrics: { temperature: 30.0, humidity: 50.0, gas: 0.1, vibration: 0.5, current: 1.0 },
-      system_state: { cloud_connected: true, voice_state: "idle", sensor_online: true },
+      device_id: "board_2k0301",
+      metrics: {
+        temperature: 25.0,
+        humidity: 55.0,
+        tvoc: 120,
+        eco2: 450,
+        mq3_value: 0.123,
+        flame_detected: false,
+        risk_score: 0,
+      },
+      system_state: { cloud_connected: true, voice_state: "idle", sensor_online: true, actuator_online: true, source: "2k0301" },
     },
     temperature_warning: {
-      device_id: "web_temperature_warning",
-      metrics: { temperature: 65.0, humidity: 50.0, gas: 0.1, vibration: 0.5, current: 1.0 },
-      system_state: { cloud_connected: true, voice_state: "idle", sensor_online: true },
+      device_id: "board_2k0301",
+      metrics: {
+        temperature: 65.0,
+        humidity: 52.0,
+        tvoc: 180,
+        eco2: 620,
+        mq3_value: 0.08,
+        flame_detected: false,
+        risk_score: 35,
+      },
+      system_state: { cloud_connected: true, voice_state: "idle", sensor_online: true, actuator_online: true, source: "2k0301" },
     },
     gas_alarm: {
-      device_id: "web_gas_alarm",
-      metrics: { temperature: 30.0, humidity: 50.0, gas: 0.65, vibration: 0.5, current: 1.0 },
-      system_state: { cloud_connected: true, voice_state: "idle", sensor_online: true },
+      device_id: "board_2k0301",
+      metrics: {
+        temperature: 31.0,
+        humidity: 58.0,
+        tvoc: 2600,
+        eco2: 2400,
+        mq3_value: 0.86,
+        flame_detected: false,
+        risk_score: 78,
+      },
+      system_state: { cloud_connected: true, voice_state: "idle", sensor_online: true, actuator_online: true, source: "2k0301" },
     },
-    vibration_alarm: {
-      device_id: "web_vibration_alarm",
-      metrics: { temperature: 30.0, humidity: 50.0, gas: 0.1, vibration: 2.8, current: 1.0 },
-      system_state: { cloud_connected: true, voice_state: "idle", sensor_online: true },
+    flame_alarm: {
+      device_id: "board_2k0301",
+      metrics: {
+        temperature: 43.0,
+        humidity: 41.0,
+        tvoc: 900,
+        eco2: 1200,
+        mq3_value: 0.18,
+        flame_detected: true,
+        risk_score: 92,
+      },
+      system_state: { cloud_connected: true, voice_state: "idle", sensor_online: true, actuator_online: true, source: "2k0301" },
     },
     sensor_offline: {
-      device_id: "web_sensor_offline",
-      metrics: { temperature: 30.0, humidity: 50.0, gas: 0.1, vibration: 0.5, current: 1.0 },
-      system_state: { cloud_connected: true, voice_state: "idle", sensor_online: false },
+      device_id: "board_2k0301",
+      metrics: {
+        temperature: 0.0,
+        humidity: 0.0,
+        tvoc: 0,
+        eco2: 0,
+        mq3_value: 0,
+        flame_detected: false,
+        risk_score: 0,
+      },
+      system_state: { cloud_connected: true, voice_state: "idle", sensor_online: false, actuator_online: false, source: "2k0301" },
     },
   },
 };
+
+const SENSOR_METRIC_ORDER = ["temperature", "humidity", "tvoc", "eco2", "mq3_value", "flame_detected", "risk_score"];
 
 const els = {
   pageTabs: Array.from(document.querySelectorAll("[data-page-tab]")),
@@ -57,6 +100,7 @@ const els = {
   commandPayload: document.querySelector("#commandPayload"),
   commandForm: document.querySelector("#commandForm"),
   commandResult: document.querySelector("#commandResult"),
+  commandAck: document.querySelector("#commandAck"),
   loadAlarmsButton: document.querySelector("#loadAlarmsButton"),
   metricChart: document.querySelector("#metricChart"),
   evaluateScenario: document.querySelector("#evaluateScenario"),
@@ -127,6 +171,16 @@ async function request(path, options = {}) {
   return response.json();
 }
 
+async function requestOptional(path) {
+  try {
+    return await request(path);
+  } catch (error) {
+    if (`${error.message || ""}`.startsWith("404 ")) return null;
+    console.warn(`optional request failed: ${path}`, error);
+    return null;
+  }
+}
+
 function setConnection(ok, text) {
   els.connectionBadge.textContent = text;
   els.connectionBadge.classList.toggle("is-muted", !ok);
@@ -140,10 +194,46 @@ function formatTime(value) {
   return date.toLocaleString("zh-CN", { hour12: false });
 }
 
-function formatValue(value) {
-  if (typeof value === "number") return Number.isInteger(value) ? `${value}` : value.toFixed(1);
-  if (typeof value === "boolean") return value ? "true" : "false";
-  return `${value}`;
+function numberText(value, digits = 1) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return `${value ?? "--"}`;
+  if (Number.isInteger(numeric)) return `${numeric}`;
+  return numeric.toFixed(digits).replace(/\.?0+$/, "");
+}
+
+function formatMetricValue(name, value, options = {}) {
+  const short = options.short === true;
+  if (name === "flame_detected") {
+    const detected = value === true || value === "true" || value === 1 || value === "1";
+    return detected ? (short ? "有火焰" : "检测到火焰") : (short ? "无火焰" : "未检测到火焰");
+  }
+  if (typeof value === "boolean") return value ? "是" : "否";
+  const numeric = Number(value);
+  if (name === "temperature" && Number.isFinite(numeric) && numeric <= -900) return "暂无数据";
+  if (name === "humidity" && Number.isFinite(numeric) && numeric < 0) return "暂无数据";
+
+  const units = {
+    temperature: "℃",
+    humidity: "%RH",
+    tvoc: "ppb",
+    eco2: "ppm",
+    mq3_value: "mg/L",
+    gas: "",
+    risk_score: "/100",
+  };
+  const digits = {
+    temperature: 1,
+    humidity: 1,
+    tvoc: 0,
+    eco2: 0,
+    mq3_value: 3,
+    gas: 3,
+    risk_score: 0,
+  }[name] ?? 1;
+  const text = numberText(value, digits);
+  const unit = units[name];
+  if (!unit) return text;
+  return name === "risk_score" ? `${text} ${unit}` : `${text} ${unit}`;
 }
 
 function cleanText(value, fallback) {
@@ -174,11 +264,21 @@ function alarmLabel(level) {
   return "正常";
 }
 
+function deviceStatusLabel(status) {
+  const labels = {
+    online: "在线",
+    offline: "离线",
+    maintenance: "维护中",
+    unknown: "未知",
+  };
+  return labels[status] || status || "未知";
+}
+
 function metricLabel(name) {
   const labels = {
     temperature: "温度",
     humidity: "湿度",
-    gas: "气体",
+    gas: "归一化气体风险",
     smoke: "烟雾",
     light: "光照",
     noise: "噪声",
@@ -187,16 +287,22 @@ function metricLabel(name) {
     vibration: "振动",
     tvoc: "TVOC",
     eco2: "eCO2",
-    mq3_value: "MQ-3",
-    flame_detected: "火焰",
-    risk_score: "风险分",
+    mq3_value: "MQ-3 乙醇",
+    flame_detected: "火焰检测",
+    risk_score: "综合风险",
   };
   return labels[name] || name;
 }
 
 function normalizeMetric(name, value) {
+  if (name === "flame_detected") {
+    return value === true || value === "true" || value === 1 || value === "1" ? 1 : 0;
+  }
   const numeric = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numeric)) return 0;
+  if (name === "temperature" && numeric <= -900) return 0;
+  if (name === "humidity" && numeric < 0) return 0;
+  if (name === "eco2") return Math.max(0, Math.min(1, (numeric - 400) / 1600));
   const scale = {
     temperature: 80,
     humidity: 100,
@@ -207,8 +313,7 @@ function normalizeMetric(name, value) {
     voltage: 300,
     current: 30,
     vibration: 3,
-    tvoc: 1000,
-    eco2: 5000,
+    tvoc: 2000,
     mq3_value: 1,
     risk_score: 100,
   }[name] || Math.max(100, numeric);
@@ -216,6 +321,9 @@ function normalizeMetric(name, value) {
 }
 
 function latestMetrics() {
+  const evaluateMetrics = latestEvaluateMetrics();
+  if (evaluateMetrics.length) return evaluateMetrics;
+
   const rows = state.summary?.latest_telemetry || [];
   return rows.flatMap((item) =>
     Object.entries(item.metrics || {}).map(([name, value]) => ({
@@ -227,11 +335,42 @@ function latestMetrics() {
   );
 }
 
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
+}
+
+function sensorMetricsFromStatus(status) {
+  const nested = status?.sensor_metrics || {};
+  const metrics = {};
+  SENSOR_METRIC_ORDER.forEach((name) => {
+    if (hasOwn(nested, name)) {
+      metrics[name] = nested[name];
+    } else if (hasOwn(status, name)) {
+      metrics[name] = status[name];
+    }
+  });
+  return metrics;
+}
+
+function latestEvaluateMetrics() {
+  const latest = state.latestEvaluation;
+  const status = latest?.response?.final_status;
+  if (!status) return [];
+  const metrics = sensorMetricsFromStatus(status);
+  return SENSOR_METRIC_ORDER.filter((name) => hasOwn(metrics, name)).map((name) => ({
+    deviceId: status.device_id || latest.request?.device_id || "board_2k0301",
+    timestamp: status.timestamp || latest.request?.timestamp,
+    name,
+    value: metrics[name],
+  }));
+}
+
 function renderKpis() {
   const summary = state.summary || {};
   const total = summary.device_total || 0;
   const online = summary.online_device_total || 0;
-  const metrics = summary.metric_names || [];
+  const evaluateMetrics = latestEvaluateMetrics().map((metric) => metric.name);
+  const metrics = evaluateMetrics.length ? evaluateMetrics : summary.metric_names || [];
   els.deviceTotal.textContent = total;
   els.onlineTotal.textContent = online;
   els.activeAlarmTotal.textContent = summary.active_alarm_total || 0;
@@ -257,7 +396,7 @@ function renderMetrics() {
       (metric) => `
         <div class="metric-card">
           <span class="metric-name">${escapeHtml(metricLabel(metric.name))}</span>
-          <span class="metric-value">${escapeHtml(formatValue(metric.value))}</span>
+          <span class="metric-value">${escapeHtml(formatMetricValue(metric.name, metric.value))}</span>
           <span class="metric-device">${escapeHtml(metric.deviceId)} · ${escapeHtml(formatTime(metric.timestamp))}</span>
         </div>
       `,
@@ -297,13 +436,13 @@ function renderDevices() {
   const counts = state.summary?.device_status || {};
   els.deviceStatusText.textContent =
     Object.entries(counts)
-      .map(([key, value]) => `${key}: ${value}`)
+      .map(([key, value]) => `${deviceStatusLabel(key)}: ${value}`)
       .join(" / ") || "暂无设备";
 
   if (!devices.length) {
     els.deviceList.className = "device-list empty-state";
     els.deviceList.textContent = "暂无设备";
-    els.commandDevice.innerHTML = "";
+    renderCommandTargets(devices);
     return;
   }
 
@@ -317,21 +456,31 @@ function renderDevices() {
         <div class="device-item">
           <div class="device-top">
             <span class="device-title">${escapeHtml(name)}</span>
-            <span class="pill ${statusClass}">${escapeHtml(device.status || "unknown")}</span>
+            <span class="pill ${statusClass}">${escapeHtml(deviceStatusLabel(device.status))}</span>
           </div>
           <span class="muted">${escapeHtml(device.device_id)} · ${escapeHtml(device.device_type || "-")}</span>
           <span>${escapeHtml(location)}</span>
-          <span class="muted">last seen: ${escapeHtml(formatTime(device.last_seen))}</span>
+          <span class="muted">最后在线：${escapeHtml(formatTime(device.last_seen))}</span>
         </div>
       `;
     })
     .join("");
 
+  renderCommandTargets(devices);
+}
+
+function renderCommandTargets(devices) {
   const current = els.commandDevice.value;
-  els.commandDevice.innerHTML = devices
+  const commandTargets = [...(devices || [])];
+  if (!commandTargets.some((device) => device.device_id === "board_2k0301")) {
+    commandTargets.unshift({ device_id: "board_2k0301" });
+  }
+  els.commandDevice.innerHTML = commandTargets
     .map((device) => `<option value="${escapeHtml(device.device_id)}">${escapeHtml(device.device_id)}</option>`)
     .join("");
-  if (current) els.commandDevice.value = current;
+  if (current && commandTargets.some((device) => device.device_id === current)) {
+    els.commandDevice.value = current;
+  }
 }
 
 function resizeCanvas(canvas) {
@@ -392,7 +541,7 @@ function drawChart(metrics) {
 
     ctx.fillStyle = "#17211d";
     ctx.font = font(13, "800");
-    ctx.fillText(formatValue(metric.value), x, y - 8 * ratio);
+    ctx.fillText(formatMetricValue(metric.name, metric.value, { short: true }), x, y - 8 * ratio);
 
     ctx.fillStyle = "#64726b";
     ctx.font = font(12, "700");
@@ -407,12 +556,14 @@ async function refresh() {
   localStorage.setItem("safecloud.apiBase", state.apiBase);
   setConnection(false, "连接中");
   try {
-    const [summary, devices] = await Promise.all([
+    const [summary, devices, latestEvaluation] = await Promise.all([
       request("/api/dashboard/summary"),
       request("/api/devices"),
+      requestOptional("/api/evaluate/latest"),
     ]);
     state.summary = summary;
     state.devices = devices;
+    state.latestEvaluation = latestEvaluation;
     renderKpis();
     renderMetrics();
     renderAlarms();
@@ -468,6 +619,88 @@ async function submitCommand(event) {
   }
 }
 
+async function submitCommandV2(event) {
+  event.preventDefault();
+  const deviceId = els.commandDevice.value;
+  if (!deviceId) {
+    els.commandResult.textContent = "没有可用设备";
+    return;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(els.commandPayload.value);
+  } catch {
+    els.commandResult.textContent = "参数 JSON 无效";
+    return;
+  }
+
+  const submitButton = els.commandForm.querySelector("button[type='submit']");
+  try {
+    submitButton.disabled = true;
+    els.commandResult.textContent = "正在下发并等待 ACK";
+    els.commandAck.className = "command-ack empty-state";
+    els.commandAck.textContent = "waiting...";
+    const command = await request("/api/commands", {
+      method: "POST",
+      body: JSON.stringify({
+        device_id: deviceId,
+        command_type: els.commandType.value,
+        command_payload: payload,
+      }),
+    });
+    renderCommandResult(command);
+  } catch (error) {
+    console.error(error);
+    els.commandResult.textContent = "命令下发失败";
+    els.commandAck.className = "command-ack empty-state";
+    els.commandAck.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+  }
+}
+
+function renderCommandResult(command) {
+  const ack = command.ack || null;
+  if (command.delivery_status) {
+    const ok = command.status === "executed" || ack?.ok === true;
+    const message = ack?.message || command.result_message || command.delivery_status;
+    els.commandResult.textContent = `${ok ? "ACK 成功" : "ACK 失败"} · ${message}`;
+    els.commandAck.className = `command-ack ${ok ? "is-ok" : "is-error"}`;
+    els.commandAck.textContent = JSON.stringify(
+      {
+        command_id: command.command_id,
+        status: command.status,
+        delivery_status: command.delivery_status,
+        elapsed_ms: command.delivery_elapsed_ms,
+        ack,
+        transport_error: command.transport_error,
+      },
+      null,
+      2,
+    );
+    return;
+  }
+
+  els.commandResult.textContent = `已创建 ${command.command_id}`;
+  els.commandAck.className = "command-ack empty-state";
+  els.commandAck.textContent = "当前 SafeCloud 未启用 MQTT 直连，命令已进入待执行队列。";
+}
+
+function commandPreset(commandType) {
+  const presets = {
+    fan_control: { state: "on", speed: 60, duration_ms: 1000 },
+    buzzer_control: { state: "on", pattern: "fast", duration_ms: 1000 },
+    alarm_light: { color: "red", mode: "blink", duration_ms: 1000 },
+    device_reset: { target: "actuator_state" },
+  };
+  return presets[commandType] || {};
+}
+
+function refreshCommandPreset() {
+  els.commandPayload.value = JSON.stringify(commandPreset(els.commandType.value), null, 2);
+}
+
 async function runEvaluate() {
   const scenarioName = els.evaluateScenario.value;
   const scenario = state.evaluateScenarios[scenarioName] || state.evaluateScenarios.normal;
@@ -475,6 +708,13 @@ async function runEvaluate() {
   payload.include_debug = els.evaluateDebug.checked;
   payload.use_real_llm = els.evaluateRealLlm.checked;
   payload.force_model = els.evaluateModel.value;
+
+  if (payload.use_real_llm && payload.force_model === "mock") {
+    els.evaluateStatus.textContent = "配置冲突";
+    els.evaluateResult.className = "evaluate-result empty-state";
+    els.evaluateResult.textContent = "真实 LLM 模式不能强制选择 mock，请选择自动仲裁或真实模型。";
+    return;
+  }
 
   els.runEvaluateButton.disabled = true;
   els.evaluateStatus.textContent = "评估中";
@@ -486,7 +726,10 @@ async function runEvaluate() {
       method: "POST",
       body: JSON.stringify(payload),
     });
+    state.latestEvaluation = { request: payload, response: result };
     renderEvaluateResult(result);
+    renderKpis();
+    renderMetrics();
     els.evaluateStatus.textContent = "已完成";
   } catch (error) {
     console.error(error);
@@ -496,6 +739,22 @@ async function runEvaluate() {
   } finally {
     els.runEvaluateButton.disabled = false;
   }
+}
+
+function renderSensorMetricGrid(status) {
+  const metrics = sensorMetricsFromStatus(status);
+  const cards = SENSOR_METRIC_ORDER.filter((name) => hasOwn(metrics, name)).map(
+    (name) => `
+      <div class="sensor-result-card">
+        <span>${escapeHtml(metricLabel(name))}</span>
+        <strong>${escapeHtml(formatMetricValue(name, metrics[name]))}</strong>
+      </div>
+    `,
+  );
+  if (!cards.length) {
+    return `<div class="sensor-result-card"><span>301 传感器</span><strong>暂无数据</strong></div>`;
+  }
+  return cards.join("");
 }
 
 function renderEvaluateResult(result) {
@@ -545,6 +804,7 @@ function renderEvaluateResult(result) {
       <span>播报</span>
       <p>${escapeHtml(status.voice_text || "-")}</p>
     </div>
+    <div class="sensor-result-grid">${renderSensorMetricGrid(status)}</div>
     <div class="status-line">
       <span>路由</span>
       <p>${escapeHtml((router.selected_models || []).join(" / ") || "无")}</p>
@@ -559,7 +819,8 @@ els.pageTabs.forEach((tab) => {
 els.refreshButton.addEventListener("click", refresh);
 els.apiBaseInput.addEventListener("change", refresh);
 els.loadAlarmsButton.addEventListener("click", loadAllAlarms);
-els.commandForm.addEventListener("submit", submitCommand);
+els.commandForm.addEventListener("submit", submitCommandV2);
+els.commandType.addEventListener("change", refreshCommandPreset);
 els.runEvaluateButton.addEventListener("click", runEvaluate);
 window.addEventListener("hashchange", () => setActivePage(getInitialPage(), false));
 window.addEventListener("resize", () => {
@@ -567,5 +828,6 @@ window.addEventListener("resize", () => {
 });
 
 setActivePage(state.activePage, false);
+refreshCommandPreset();
 refresh();
 setInterval(refresh, 8000);

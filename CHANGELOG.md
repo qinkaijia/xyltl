@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- 统一 2K1000LA 默认 MQTT topic 为真实 301 使用的 `device/board_2k0301/...`，并同步更新测试与联调文档。
+- 完成真实链路约 5 分钟稳定性测试：301 -> 2K1000LA MQTT -> SafeCloud `/api/evaluate` -> `runtime/latest_evaluate_response.json`，共写出 155 次评估结果。
+- 验证 Qt HMI 可通过 `--status-file runtime/latest_evaluate_response.json` 读取真实 301 输出文件，并记录板端 offscreen 烟测命令。
+- 增加共享 MQTT 控制客户端 `modules/control`，统一 SafeCloud、Web 和语音链路的 301 命令下发与 ACK 等待。
+- SafeCloud `POST /api/commands` 已支持直接下发 `fan_control`、`buzzer_control`、`alarm_light` 到 301，并返回 `delivery_status`、ACK 和耗时。
+- Web Dashboard 告警控制页已显示命令 ACK、耗时和错误状态。
+- 语音 demo 已接入真实 MQTT 控制链路，板端验证 `打开风扇`、`打开蜂鸣器`、`红灯闪烁` 均收到 301 成功 ACK。
+- Qt HMI 增加 `--voice-file`，显示语音助手状态、最近问题、模型回复和执行结果。
+- 语音 demo 增加普通问答真实 LLM 接入，支持 `qwen/doubao/deepseek/kimi/zhipu`，并限制历史轮数、问题长度、上下文长度和回复长度。
+
 - 初始化 SafetyGuardian-Loongson 项目框架、协议 Schema 和模块目录。
 - 增加 SafeCloud 云端原型，支持设备管理、遥测上传、阈值报警、命令轮询、Dashboard 汇总和模拟设备。
 - 增加 SafeCloud Web Dashboard。
@@ -25,3 +35,8 @@
 - 增加赛题方向二要求摘要文档，用于约束后续功能不偏离“基于 LLM 的智能检测工业仪器设计”。
 - 2K1000LA 客户端增加 `scenario/mock/2k0301` 数据源抽象，并为 `2k0301` 实现 Wi-Fi + MQTT 订阅与字段转换入口。
 - SafeCloud Web Dashboard 增加 `/api/evaluate` 安全评估面板，支持从网页选择模拟场景并查看模型详情。
+- SafeCloud Web Dashboard 优化为分页面控制台，分离监护总览、环境监测、AI 评估和告警控制。
+- 在 2K1000LA 上安装并验证 Mosquitto MQTT Broker，301 可连接并发布真实 `sensor` 与 `heartbeat`。
+- 完成真实链路联调：301 MQTT 数据 -> 2K1000LA `cloud_client.py --sensor-source 2k0301` -> SafeCloud `/api/evaluate` -> `final_status`。
+- 验证 2K1000LA 到 301 的 MQTT 命令下发和 ACK 回传，`fan_control` 测试命令返回成功 ACK。
+- 增加根目录 `NEXT_STEPS.md`，记录当前网络角色、真实 topic、联调命令、已知问题和下一步优先级。

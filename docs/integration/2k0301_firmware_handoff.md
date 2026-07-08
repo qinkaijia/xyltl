@@ -14,21 +14,21 @@
 
 当前网络记录：
 
-- 2K0301：`192.168.43.39`，DHCP 动态获取。
-- 2K1000LA：`192.168.43.40`，DHCP 动态获取。
+- 2K0301：`192.168.43.40`，DHCP 动态获取。
+- 2K1000LA：`192.168.43.36`，DHCP 动态获取。
 - MQTT Broker：运行在 2K1000LA。
-- Broker 地址：`192.168.43.40:1883`。
+- Broker 地址：`192.168.43.36:1883`。
 - 认证：无用户名/密码。
 
 ## Topic 约定
 
 | 方向 | Topic | QoS | 说明 |
 | --- | --- | --- | --- |
-| 2K0301 -> 2K1000LA | `device/2k0301/sensor` | 1 | 传感器数据，1 Hz |
-| 2K0301 -> 2K1000LA | `device/2k0301/heartbeat` | 1 | 心跳，0.5 Hz |
-| 2K0301 -> 2K1000LA | `device/2k0301/ack` | 1 | 命令执行结果 |
-| 2K0301 -> 2K1000LA | `device/2k0301/error` | 1 | 故障事件 |
-| 2K1000LA -> 2K0301 | `device/2k0301/command` | 1 | 执行控制命令 |
+| 2K0301 -> 2K1000LA | `device/board_2k0301/sensor` | 1 | 传感器数据，1 Hz |
+| 2K0301 -> 2K1000LA | `device/board_2k0301/heartbeat` | 1 | 心跳，0.5 Hz |
+| 2K0301 -> 2K1000LA | `device/board_2k0301/ack` | 1 | 命令执行结果 |
+| 2K0301 -> 2K1000LA | `device/board_2k0301/error` | 1 | 故障事件 |
+| 2K1000LA -> 2K0301 | `device/board_2k0301/command` | 1 | 执行控制命令 |
 
 后续多节点扩展时，可改为 `device/{device_id}/sensor` 等格式。
 
@@ -37,7 +37,7 @@
 Topic：
 
 ```text
-device/2k0301/sensor
+device/board_2k0301/sensor
 ```
 
 真实示例：
@@ -97,7 +97,7 @@ device/2k0301/sensor
 Topic：
 
 ```text
-device/2k0301/heartbeat
+device/board_2k0301/heartbeat
 ```
 
 示例：
@@ -121,7 +121,7 @@ device/2k0301/heartbeat
 Topic：
 
 ```text
-device/2k0301/command
+device/board_2k0301/command
 ```
 
 风扇 / 排风：
@@ -150,6 +150,7 @@ device/2k0301/command
 
 要求：
 
+- 2K1000LA、SafeCloud 和语音链路统一发送 compact JSON；当前已验证的 301 程序对命令 JSON 空格比较敏感，固件后续增强解析器时也请继续兼容 compact 格式。
 - 收到命令后立即解析并执行。
 - 硬件未接时可以记录日志并返回 `ok=true`，但 message 中要说明。
 - 未知命令或非法参数必须返回 `ok=false`。
@@ -160,7 +161,7 @@ device/2k0301/command
 Topic：
 
 ```text
-device/2k0301/ack
+device/board_2k0301/ack
 ```
 
 成功：
@@ -180,7 +181,7 @@ device/2k0301/ack
 Topic：
 
 ```text
-device/2k0301/error
+device/board_2k0301/error
 ```
 
 示例：
@@ -214,9 +215,9 @@ device/2k0301/error
 ## 301 侧自测清单
 
 1. 上电后能连接手机热点。
-2. 能连接 2K1000LA 上的 MQTT Broker：`192.168.43.40:1883`。
-3. 每秒发布一次 `device/2k0301/sensor`。
-4. 每 2 秒发布一次 `device/2k0301/heartbeat`。
+2. 能连接 2K1000LA 上的 MQTT Broker：`192.168.43.36:1883`。
+3. 每秒发布一次 `device/board_2k0301/sensor`。
+4. 每 2 秒发布一次 `device/board_2k0301/heartbeat`。
 5. 收到 `fan_control`、`buzzer_control`、`alarm_light`、`device_reset` 后能返回 ACK。
 6. 收到未知命令能返回失败 ACK。
 7. 断开传感器或通信异常时能发布 error，并且主循环不死锁。
@@ -234,14 +235,14 @@ sudo systemctl enable --now mosquitto
 监听 301 上报：
 
 ```bash
-mosquitto_sub -h localhost -t "device/2k0301/#" -v
+mosquitto_sub -h localhost -t "device/board_2k0301/#" -v
 ```
 
 模拟下发命令：
 
 ```bash
 mosquitto_pub -h localhost \
-  -t "device/2k0301/command" \
+  -t "device/board_2k0301/command" \
   -q 1 \
   -m '{"type":"command","seq":2001,"command":"fan_control","params":{"state":"on","speed":80,"duration_ms":30000}}'
 ```

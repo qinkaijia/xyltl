@@ -46,7 +46,7 @@ simulator/mock_device.py     模拟设备
 1. 板端或模拟设备调用 `POST /api/evaluate`。
 2. SafeCloud 将 `metrics` 和 `system_state` 转换为 analyzer 输入。
 3. Analyzer 执行 RuleEngine、TaskClassifier、ModelRouter。
-4. 当 `use_real_llm=true` 时，按路由调用 DeepSeek、Kimi、智谱、豆包或通义；失败自动回退 mock。
+4. 当 `use_real_llm=true` 时，按路由调用 DeepSeek、Kimi、智谱、豆包或通义；失败显式记录错误并由本地规则兜底，不生成 mock 占位结果。
 5. JudgeModel 融合结果，SafetyGuard 保证不降低本地规则等级。
 6. SafeCloud 返回 `final_status`，供 HMI、语音播报和后续控制链路使用。
 

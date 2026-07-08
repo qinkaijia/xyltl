@@ -44,3 +44,14 @@ def test_sensor_offline_forces_alarm():
     result = RuleEngine.from_file(THRESHOLDS).evaluate(make_sensor(), SystemState(sensor_online=False))
     assert result.alarm_level == 2
 
+
+def test_sensor_offline_ignores_invalid_sentinel_values():
+    result = RuleEngine.from_file(THRESHOLDS).evaluate(
+        make_sensor(temperature=-999.0, humidity=-1.0),
+        SystemState(sensor_online=False),
+    )
+
+    assert result.alarm_level == 2
+    assert "SENSOR_OFFLINE" in result.rule_hits
+    assert "HUMIDITY_ALARM" not in result.rule_hits
+    assert "TEMPERATURE_ALARM" not in result.rule_hits

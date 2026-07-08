@@ -1,7 +1,7 @@
 #ifndef __LQ_SHT30_HPP__
 #define __LQ_SHT30_HPP__
 
-#include "lq_drv_inc.hpp"
+#include "lq_fs_i2c.hpp"
 
 /****************************************************************************************************
  * @brief   SHT30 温湿度传感器类，硬件 I2C 驱动

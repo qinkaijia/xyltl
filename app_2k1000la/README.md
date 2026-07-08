@@ -23,7 +23,7 @@
 `cloud_client.py` 支持三类数据源，云端、HMI 和语音链路保持同一份 `/api/evaluate` payload：
 
 - `--sensor-source scenario`：读取一个场景文件，默认 `tests/scenarios/evaluate/normal.json`。
-- `--sensor-source mock`：按正常、温度预警、气体报警、振动报警、传感器离线五类场景循环输出。
+- `--sensor-source mock`：按正常、温度预警、气体报警、火焰报警、传感器离线五类 301 风格场景循环输出。
 - `--sensor-source 2k0301`：订阅本机或指定 Broker 上的 2K0301 MQTT Topic。
 
 依赖安装：
@@ -58,13 +58,25 @@ python3 app_2k1000la/cloud_client.py \
 
 当前 301 侧约定：
 
-- 301 IP：`192.168.43.39`，DHCP 动态获取。
-- 2K1000LA IP：当前记录为 `192.168.43.40`，DHCP 动态获取。
-- Broker：运行在 2K1000LA，301 连接 `192.168.43.40:1883`，2K1000LA 本地客户端默认连接 `127.0.0.1:1883`。
+- 本轮 Windows SafeCloud：`192.168.43.5:8010`。
+- 本轮 301 IP：`192.168.43.40`，DHCP 动态获取。
+- 本轮 2K1000LA IP：`192.168.43.36`，DHCP 动态获取。
+- Broker：运行在 2K1000LA，301 连接 `192.168.43.36:1883`，2K1000LA 本地客户端默认连接 `127.0.0.1:1883`。
 - 认证：无。
-- Topic：`device/2k0301/sensor`、`device/2k0301/heartbeat`、`device/2k0301/ack`、`device/2k0301/error`、`device/2k0301/command`，QoS 1。
+- Topic：`device/board_2k0301/sensor`、`device/board_2k0301/heartbeat`、`device/board_2k0301/ack`、`device/board_2k0301/error`、`device/board_2k0301/command`，QoS 1。
 
 2K1000LA 会把 301 上报的 `temperature/humidity/tvoc/eco2/mq3_value/risk_score/flame_detected` 转换为云端 `metrics`。其中 `gas` 取 TVOC、eCO2、MQ-3、`risk_score` 的归一化最大值；`flame_detected=true` 时强制 `gas=1.0`，触发本地/云端高风险判断。
+
+本轮稳定性结果：
+
+- `cloud_client.py --sensor-source 2k0301 --loop --interval 2` 连续写出 155 次 `evaluate_result`。
+- 输出文件已收敛到 `runtime/latest_evaluate_response.json`。
+- 末段请求延迟约 33-55 ms，最终状态为 `alarm_level=0`、`status_text=正常`、`analysis_mode=rule_fallback`。
+- Qt HMI 已用 `--status-file runtime/latest_evaluate_response.json` 在板端完成 offscreen 烟测。
+- SafeCloud/Web 命令链路已能通过 `POST /api/commands` 下发 `fan_control`、`buzzer_control`、`alarm_light` 并收到 301 ACK。
+- 语音 demo 已在 2K1000LA 上通过 `--mqtt-control --mqtt-host 127.0.0.1` 复用同一 MQTT 控制链路，三条常用语音控制命令均收到 ACK。
+
+控制命令统一由 `modules/control` 封装，发送到 `device/board_2k0301/command` 并等待 `device/board_2k0301/ack`。当前 301 命令解析对 JSON 空格敏感，客户端统一发布 compact JSON。
 
 ## 自动网络适配
 
@@ -197,4 +209,4 @@ PYTHONPATH=. python -m pytest app_2k1000la/tests
 
 - 将该客户端封装到 2K1000LA 主控常驻进程。
 - 根据 301 实测日志继续调优 MQTT 断线重连、离线判定和执行命令 ACK 展示。
-- 将 `final_status` 同步给 Qt HMI、语音播报和本地执行控制。
+- 根据现场屏幕交互需要，把 Qt HMI 控制按钮接入 `modules/control`。

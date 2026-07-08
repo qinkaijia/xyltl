@@ -38,3 +38,21 @@ def update_command_result(db: Session, command: Command, payload: CommandResult)
     db.commit()
     db.refresh(command)
     return command
+
+
+def apply_delivery_result(db: Session, command: Command, delivery: dict) -> Command:
+    now = datetime.now(timezone.utc)
+    command.sent_at = now
+    command.executed_at = now
+    command.status = "executed" if delivery.get("ok") else "failed"
+    ack = delivery.get("ack") or {}
+    command.result_message = (
+        ack.get("message")
+        or ack.get("error_code")
+        or delivery.get("error")
+        or delivery.get("status")
+        or "command delivery finished"
+    )
+    db.commit()
+    db.refresh(command)
+    return command
